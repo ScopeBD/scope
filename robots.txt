@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://scopebd.org/sitemap.xml
