@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Command Center — SCOPE Internal OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+
+    <main class="page" id="main">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">SCOPE · Internal OS</div>
+          <h1>Command Center</h1>
+        </div>
+      </div>
+
+      <div class="actions-row">
+        <button class="btn" id="new-task" disabled title="Not built yet">New task</button>
+        <button class="btn primary" id="new-project">New project</button>
+      </div>
+
+      <!-- Projects ------------------------------------------------ -->
+      <section aria-labelledby="proj-h">
+        <div class="sec-head">
+          <h2 id="proj-h">Projects</h2>
+          <a class="link" href="projects.html">View all →</a>
+        </div>
+        <div class="panel" id="projects-panel">
+          <p class="admin-note">Loading…</p>
+        </div>
+      </section>
+
+      <!-- Needs attention ----------------------------------------- -->
+      <section aria-labelledby="attn-h">
+        <div class="sec-head">
+          <h2 id="attn-h">Needs attention · <span id="attn-n">0</span></h2>
+          <a class="link" href="tasks.html">All tasks →</a>
+        </div>
+        <div class="panel">
+          <div class="attention" id="attn-body">Checking…</div>
+        </div>
+      </section>
+
+      <!-- Financial snapshot -------------------------------------- -->
+      <section aria-labelledby="fin-h" style="max-width:680px">
+        <div class="sec-head">
+          <h2 id="fin-h">Financial snapshot</h2>
+          <a class="link" href="#">Finance overview →</a>
+        </div>
+        <div class="snap" id="snap">
+          <div class="snap-row"><span class="k">Received</span><span class="v">…</span></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script type="module">
+import { requireSession, fetchFinanceSnapshot, tasks, esc, money, $ } from '../assets/js/admin-shared.js';
+import { mountShell, toast } from '../assets/js/admin-shell.js';
+
+const session = await requireSession();
+
+if (session) {
+  await mountShell('command', session);
+  wire();
+  await Promise.all([loadProjects(), loadAttention(), loadFinance()]);
+}
+
+function wire() {
+  /* Both of these go where they say — the ?new=1 flag opens the create
+     sheet on arrival rather than making you click twice. */
+  $('#new-task').addEventListener('click', () => {
+    location.href = 'tasks.html?new=1';
+  });
+  $('#new-project').addEventListener('click', () => {
+    location.href = 'projects.html?new=1';
+  });
+
+  /* Links that point at a real screen are left alone; the rest are stubs. */
+  [...document.querySelectorAll('.sec-head .link')]
+    .filter((a) => a.getAttribute('href') === '#')
+    .forEach((a) => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        toast('That screen is not built yet.');
+      });
+    });
+}
+
+/* ---------- projects --------------------------------------- */
+
+async function loadProjects() {
+  const panel = $('#projects-panel');
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, name, status, budget, due_on, client:clients(name)')
+    .order('created_at', { ascending: false })
+    .limit(6);
+
+  if (error) {
+    panel.innerHTML = `<p class="admin-note err">Could not load projects: ${esc(error.message)}</p>`;
+    return;
+  }
+
+  if (!data.length) {
+    // Mirrors the "Getting started" state in the reference.
+    panel.innerHTML = `
+      <div class="empty-state">
+        <div class="label">Getting started</div>
+        <h3>No projects yet. Create the first project to start tracking revenue and allocation.</h3>
+        <button class="btn primary" id="empty-new">New project</button>
+      </div>`;
+    $('#empty-new').addEventListener('click', () => {
+      location.href = 'projects.html?new=1';
+    });
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="scroll-x"><table>
+      <thead><tr>
+        <th>Project</th><th>Client</th><th>Status</th>
+        <th class="num">Budget</th><th>Due</th>
+      </tr></thead>
+      <tbody>${data.map((p) => `
+        <tr>
+          <td class="name">${esc(p.name)}</td>
+          <td>${esc(p.client?.name || '—')}</td>
+          <td><span class="badge" data-status="${esc(p.status)}">${esc(p.status)}</span></td>
+          <td class="num">${money(p.budget)}</td>
+          <td>${p.due_on ? new Date(p.due_on).toLocaleDateString('en-US',
+                { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+}
+
+/* ---------- needs attention -------------------------------- */
+
+async function loadAttention() {
+  // Tasks that are overdue, blocked, or due within three days.
+  let data;
+  try {
+    data = await tasks.needsAttention();
+  } catch (error) {
+    $('#attn-body').innerHTML =
+      `<span style="color:var(--stop)">Could not load tasks: ${esc(error.message)}</span>`;
+    return;
+  }
+
+  $('#attn-n').textContent = String(data.length);
+
+  if (!data.length) {
+    $('#attn-body').textContent =
+      'All clear — nothing overdue, blocked, or due soon.';
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  $('#attn-body').innerHTML = `
+    <div class="scroll-x"><table>
+      <tbody>${data.map((t) => {
+        const overdue = t.due_on && t.due_on < today;
+        const label = t.status === 'Blocked'
+          ? 'Blocked'
+          : overdue ? 'Overdue' : 'Due soon';
+        const tint = t.status === 'Blocked' || overdue ? 'rose' : 'amber';
+        return `
+          <tr>
+            <td class="name">${esc(t.title)}</td>
+            <td><span class="badge tint-${tint}"
+                 style="border-radius:999px">${label}</span></td>
+            <td style="color:var(--muted)">${t.due_on
+                  ? new Date(t.due_on).toLocaleDateString('en-US',
+                      { month: 'short', day: 'numeric' }) : '—'}</td>
+            <td style="color:var(--muted)">${esc(t.blocked_reason || '')}</td>
+          </tr>`;
+      }).join('')}</tbody>
+    </table></div>`;
+}
+
+/* ---------- financial snapshot ----------------------------- */
+
+async function loadFinance() {
+  const snap = $('#snap');
+  let fin;
+  try {
+    fin = await fetchFinanceSnapshot();
+  } catch (err) {
+    snap.innerHTML = `<p class="admin-note err">Could not load finance: ${esc(err.message)}</p>`;
+    return;
+  }
+
+  const received = Number(fin.received || 0);
+  const pending  = Number(fin.pending  || 0);
+  const costs    = Number(fin.costs    || 0);
+  const distributable = received - costs;
+
+  // Fund balances aren't modelled in the schema yet — shown as zero
+  // so the block matches the design without inventing numbers.
+  const rows = [
+    ['received',        money(received)],
+    ['pending',         money(pending)],
+    ['costs',           money(costs)],
+    ['distributable',   money(distributable), true],
+    ['company fund balance', money(0)],
+    ['salary fund balance',  money(0)],
+  ];
+
+  snap.innerHTML = rows.map(([k, v, hi]) =>
+    `<div class="snap-row ${hi ? 'hi' : ''}">
+       <span class="k">${k}</span><span class="v">${v}</span>
+     </div>`).join('');
+}
+</script>
+</body>
+</html>

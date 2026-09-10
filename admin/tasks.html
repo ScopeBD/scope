@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Tasks — SCOPE Internal OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+
+    <main class="page" id="main">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Tasks</div>
+          <h1>Tasks</h1>
+          <p class="sub">What is being worked on, by whom, and what has slipped.</p>
+        </div>
+        <div class="tools">
+          <div class="search">
+            <span class="ico" id="search-ico"></span>
+            <input id="q" type="search" placeholder="Search tasks…" aria-label="Search tasks">
+          </div>
+          <button class="btn" id="filter-btn" aria-expanded="false">
+            <span id="filter-ico"></span><span>Filter</span>
+          </button>
+          <button class="btn" id="export-btn">
+            <span id="export-ico"></span><span>Export</span>
+          </button>
+          <button class="btn primary" id="add-btn">
+            <span id="add-ico"></span><span>New Task</span>
+          </button>
+        </div>
+      </div>
+
+      <section class="stats" id="stats" aria-label="Task totals"></section>
+
+      <div class="filters" id="filters">
+        <select class="select" id="f-status-filter" aria-label="Filter by status"></select>
+        <select class="select" id="f-project-filter" aria-label="Filter by project"></select>
+        <select class="select" id="f-assignee-filter" aria-label="Filter by assignee"></select>
+        <select class="select" id="f-priority-filter" aria-label="Filter by priority"></select>
+        <button class="btn" id="overdue-btn" aria-pressed="false">Overdue only</button>
+        <span class="active-note" id="filter-note"></span>
+        <button class="btn clear" id="filter-clear">Clear filters</button>
+      </div>
+
+      <section aria-labelledby="pipe-h">
+        <div class="sec-head">
+          <h2 id="pipe-h">Task Board</h2>
+          <a class="link" href="#table-h">View All →</a>
+        </div>
+        <p class="sec-sub">Drag a task between columns to change its status.
+          Moving one to Done stamps it as complete.</p>
+        <div class="pipeline cols-4" id="pipeline"></div>
+      </section>
+
+      <section aria-labelledby="table-h">
+        <div class="sec-head">
+          <h2 id="table-h">All Tasks</h2>
+          <select class="select" id="period" style="margin-left:auto">
+            <option value="all">All time</option>
+            <option value="30">Created in last 30 days</option>
+            <option value="90">Created in last 90 days</option>
+            <option value="365">Created in last year</option>
+          </select>
+        </div>
+        <p class="sec-sub">A complete list of your tasks. Click a row to edit.</p>
+
+        <div class="tablewrap">
+          <div class="scroll-x">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:34px"><input type="checkbox" id="check-all" aria-label="Select all rows"></th>
+                  <th data-sort="title">Task</th>
+                  <th data-sort="project">Project</th>
+                  <th data-sort="assignee">Assignee</th>
+                  <th data-sort="status">Status</th>
+                  <th data-sort="priority">Priority</th>
+                  <th data-sort="due_on">Due</th>
+                  <th data-sort="created_at">Created</th>
+                  <th style="text-align:right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <div class="tablefoot">
+            <span class="showing" id="showing"></span>
+            <div class="pager" id="pager"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- Task sheet ---------------------------------------------------- -->
+<div class="modal" id="task-modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="task-modal-h">
+    <form id="task-form" novalidate>
+      <div class="sheet-head">
+        <div>
+          <h2 id="task-modal-h">New task</h2>
+          <p class="sub" id="task-modal-sub">Something that needs doing.</p>
+        </div>
+        <button type="button" class="x" data-close aria-label="Close">×</button>
+      </div>
+
+      <div class="sheet-body">
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="f-title">Task <span class="req">*</span></label>
+            <input id="f-title" name="title" autocomplete="off" required
+                   placeholder="What needs doing?">
+            <p class="err">A task needs a title.</p>
+          </div>
+
+          <div class="field">
+            <label for="f-project">Project</label>
+            <select id="f-project" name="project_id"></select>
+            <p class="hint">Leave blank for general work.</p>
+          </div>
+          <div class="field">
+            <label for="f-assignee">Assignee</label>
+            <select id="f-assignee" name="assignee_id"></select>
+          </div>
+
+          <div class="field">
+            <label for="f-status">Status</label>
+            <select id="f-status" name="status"></select>
+          </div>
+          <div class="field">
+            <label for="f-priority">Priority</label>
+            <select id="f-priority" name="priority"></select>
+          </div>
+
+          <div class="field span-2">
+            <label for="f-due">Due</label>
+            <input id="f-due" name="due_on" type="date">
+          </div>
+
+          <!-- Only meaningful while the task is Blocked; syncBlockedField()
+               keeps it in step with the status select. -->
+          <div class="field span-2" id="blocked-field" hidden>
+            <label for="f-blocked">What is it blocked on?</label>
+            <input id="f-blocked" name="blocked_reason" autocomplete="off"
+                   placeholder="Waiting on the client, staging access, …">
+            <p class="hint">Cleared automatically when the task moves on.</p>
+          </div>
+        </div>
+
+        <p class="form-msg" id="task-msg" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="sheet-foot">
+        <button type="button" class="btn danger" id="task-delete" hidden>Delete task</button>
+        <span class="push"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary" id="task-save">Save task</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script type="module">
+import { requireSession, tasks, fetchProfiles, fetchProjectOptions,
+         TASK_STATUSES, TASK_PRIORITIES, priorityLabel,
+         esc, shortDate, timeAgo, setStatus, $, $$ } from '../assets/js/admin-shared.js';
+import { mountShell, icons, toast } from '../assets/js/admin-shell.js';
+import { initDialogs, openDialog, closeDialog, confirmDialog, dangerBody,
+         fillSelect, wirePipeline, renderPager, debounce,
+         initials, downloadCsv } from '../assets/js/admin-ui.js';
+
+/* ============================================================
+   State
+   ============================================================ */
+
+const STATUSES = TASK_STATUSES;
+
+let all = [];                  // every task from the database
+let view = [];                 // after search + filters
+let profiles = [];             // assignee picker + assignee filter
+let projectOptions = [];       // project picker + project filter
+/* Tasks are due-date driven, so the soonest deadline is the useful
+   default rather than newest-first. */
+let sortKey = 'due_on';
+let sortDir = 'asc';
+let page = 1;
+const PER_PAGE = 10;
+
+const filters = { status: '', project: '', assignee: '', priority: '', overdue: false };
+let editing = null;
+
+/* Mirrors of the two free-text controls, refreshed once per render by
+   readControls() so the filter predicate doesn't hit the DOM per task. */
+let query = '';
+let periodDays = 0;
+
+/* ============================================================
+   Boot
+   ============================================================ */
+
+const session = await requireSession();
+if (session) {
+  $('#search-ico').innerHTML = icons.search;
+  $('#filter-ico').innerHTML = icons.filter;
+  $('#export-ico').innerHTML = icons.download;
+  $('#add-ico').innerHTML    = icons.plus;
+
+  await mountShell('tasks', session);
+  initDialogs();
+  fillSelect('#f-status', TASK_STATUSES);
+  fillSelect('#f-status-filter', TASK_STATUSES, 'All statuses');
+  $('#f-priority').innerHTML        = priorityOptions();
+  $('#f-priority-filter').innerHTML = priorityOptions('All priorities');
+  wireControls();
+  wireSheet();
+  syncBlockedField();
+
+  /* Independent round trips — don't serialise them. */
+  await Promise.all([load(), loadProfiles(), loadProjectOptions()]);
+
+  /* Arrived from a link: `?project=<id>` focuses the list on one project,
+     and `?new=1` opens the sheet. The Command Center's "New task" uses
+     both together so the button does what it says. */
+  const params = new URLSearchParams(location.search);
+  const focus = params.get('project');
+
+  if (focus && projectOptions.some((p) => p.id === focus)) {
+    filters.project = focus;
+    $('#f-project-filter').value = focus;
+  }
+
+  if (params.get('new')) {
+    /* Only inherit the project if it's one we actually know about. */
+    openSheet(null, 'Todo', focus && projectOptions.some((p) => p.id === focus) ? focus : null);
+  }
+
+  if (focus || params.get('new')) {
+    /* Drop the flags so a reload doesn't reapply them. */
+    history.replaceState(null, '', location.pathname);
+    render();
+  }
+}
+
+async function load() {
+  try {
+    all = await tasks.list();
+    render();
+  } catch (err) {
+    console.error(err);
+    $('#rows').innerHTML =
+      `<tr><td colspan="9"><p class="admin-note err">
+         Could not load tasks: ${esc(err.message)}
+       </p></td></tr>`;
+    $('#pipeline').innerHTML = '';
+    $('#stats').innerHTML = '';
+  }
+}
+
+async function loadProfiles() {
+  try {
+    profiles = await fetchProfiles();
+  } catch (err) {
+    console.error(err);
+    profiles = [];
+  }
+
+  const me = session?.user;
+  if (me && !profiles.some((p) => p.id === me.id)) {
+    profiles.unshift({
+      id: me.id,
+      full_name: me.user_metadata?.full_name?.trim() || me.email || 'You',
+    });
+  }
+  fillPicker('#f-assignee', profiles, 'Unassigned', (p) => p.full_name || 'Unnamed');
+  fillPicker('#f-assignee-filter', profiles, 'All assignees', (p) => p.full_name || 'Unnamed');
+}
+
+async function loadProjectOptions() {
+  try {
+    projectOptions = await fetchProjectOptions();
+  } catch (err) {
+    console.error(err);
+    projectOptions = [];
+  }
+  fillPicker('#f-project', projectOptions, 'No project', (p) => p.name);
+  fillPicker('#f-project-filter', projectOptions, 'All projects', (p) => p.name);
+}
+
+/** Fill a <select> of records, keeping whatever is currently chosen. */
+function fillPicker(sel, list, blank, label) {
+  const el = $(sel);
+  if (!el) return;
+  const current = el.value;
+  el.innerHTML = `<option value="">${esc(blank)}</option>` +
+    list.map((r) => `<option value="${esc(r.id)}">${esc(label(r))}</option>`).join('');
+  el.value = current;
+}
+
+/** Priority <select> options, from the shared list so the labels can't
+    drift from the ones the table and cards render. */
+function priorityOptions(blank) {
+  return (blank ? `<option value="">${esc(blank)}</option>` : '') +
+    TASK_PRIORITIES.map((p) => `<option value="${p.value}">${esc(p.label)}</option>`).join('');
+}
+
+/* ============================================================
+   Derived values
+   ============================================================ */
+
+/**
+ * Today as YYYY-MM-DD in *local* time.
+ *
+ * `toISOString()` would hand back the UTC date, which in Dhaka (UTC+6)
+ * is still yesterday until 6am — that would call a task due today
+ * "overdue" for the first six hours of every day. A due date is a local
+ * calendar date, so compare it against a local one.
+ */
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` +
+         `-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Past its due date and not finished. A task with no due date is never
+    overdue. */
+function isOverdue(t) {
+  if (!t.due_on || t.status === 'Done') return false;
+  return t.due_on < todayIso();
+}
+
+/* ============================================================
+   Filter + sort
+   ============================================================ */
+
+/**
+ * The one filter predicate, shared by the table and the board.
+ *
+ * `ignoreStatus` exists for the board: filtering it by status would leave
+ * every column but one empty. The board honours every other filter, so
+ * the two views always describe the same set of tasks.
+ *
+ * Reads `query` and `periodDays`, which readControls() refreshes once per
+ * render — reading the inputs here would mean two DOM lookups per task,
+ * twice over.
+ */
+function matches(t, { ignoreStatus = false } = {}) {
+  if (!ignoreStatus && filters.status && t.status !== filters.status) return false;
+  if (filters.project && t.project?.id !== filters.project) return false;
+  if (filters.assignee && t.assignee?.id !== filters.assignee) return false;
+  /* The select yields strings; priority is a number. */
+  if (filters.priority && String(t.priority) !== filters.priority) return false;
+  if (filters.overdue && !isOverdue(t)) return false;
+
+  if (query) {
+    const hay = [t.title, t.project?.name, t.assignee?.full_name, t.status,
+                 priorityLabel(t.priority), t.blocked_reason]
+      .filter(Boolean).join(' ').toLowerCase();
+    if (!hay.includes(query)) return false;
+  }
+
+  if (periodDays > 0) {
+    const age = (Date.now() - new Date(t.created_at).getTime()) / 86400000;
+    if (age > periodDays) return false;
+  }
+  return true;
+}
+
+function readControls() {
+  query = $('#q').value.trim().toLowerCase();
+  const days = Number($('#period').value);
+  periodDays = Number.isFinite(days) ? days : 0;
+}
+
+function applyFilters(keepPage = false) {
+  view = all.filter((t) => matches(t));
+
+  const dir = sortDir === 'asc' ? 1 : -1;
+  view.sort((a, b) => {
+    const x = sortValue(a, sortKey);
+    const y = sortValue(b, sortKey);
+
+    /* Tasks with no due date (or no assignee) sort last in both
+       directions — a blank date is neither the soonest nor the latest. */
+    const xe = x == null || x === '';
+    const ye = y == null || y === '';
+    if (xe || ye) return xe && ye ? 0 : (xe ? 1 : -1);
+
+    if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
+    return String(x).localeCompare(String(y)) * dir;
+  });
+
+  if (!keepPage) page = 1;
+}
+
+/** The columns that sort on a joined record rather than a column. */
+function sortValue(t, key) {
+  if (key === 'project')  return t.project?.name ?? '';
+  if (key === 'assignee') return t.assignee?.full_name ?? '';
+  return t[key];
+}
+
+/* ============================================================
+   Render
+   ============================================================ */
+
+function render(keepPage = false) {
+  readControls();
+  applyFilters(keepPage);
+  renderStats();
+  renderPipeline();
+  renderTable();
+  renderFilterNote();
+}
+
+function renderStats() {
+  const count = (s) => all.filter((t) => t.status === s).length;
+
+  const cards = [
+    { label: 'Total Tasks', value: all.length,          icon: 'clip',   tint: 'blue'  },
+    { label: 'To do',       value: count('Todo'),       icon: 'inbox',  tint: 'slate' },
+    { label: 'In progress', value: count('In progress'),icon: 'trend',  tint: 'blue'  },
+    { label: 'Blocked',     value: count('Blocked'),    icon: 'shield', tint: 'rose'  },
+    { label: 'Overdue',     value: all.filter(isOverdue).length, icon: 'bell', tint: 'amber' },
+    { label: 'Done',        value: count('Done'),       icon: 'check',  tint: 'green' },
+  ];
+
+  $('#stats').innerHTML = cards.map((c) => `
+    <div class="stat">
+      <span class="ic tint-${c.tint}">${icons[c.icon]}</span>
+      <span class="body">
+        <span class="val">${esc(c.value)}</span>
+        <span class="lbl">${c.label}</span>
+      </span>
+    </div>`).join('');
+}
+
+function renderPipeline() {
+  $('#pipeline').innerHTML = STATUSES.map((status) => {
+    const items = all.filter((t) => t.status === status && matches(t, { ignoreStatus: true }));
+    return `
+      <div class="col" data-status="${esc(status)}">
+        <div class="col-head">
+          <span class="name">${esc(status)}</span>
+          <span class="n">${items.length}</span>
+        </div>
+        <div class="col-body" data-drop="${esc(status)}">
+          ${items.map(cardMarkup).join('')}
+          <button class="add-lead" data-add="${esc(status)}">+ New task</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  wirePipeline($('#pipeline'), STATUSES, moveCard);
+}
+
+function cardMarkup(t) {
+  const who = t.assignee?.full_name || '';
+  const over = isOverdue(t);
+
+  return `
+    <article class="card" draggable="true" data-id="${t.id}" tabindex="0"
+             aria-label="${esc(t.title)}, ${esc(t.status)}">
+      <div class="card-top">
+        <span class="nm">${esc(t.title)}</span>
+        <button class="kebab" data-menu="${t.id}" aria-label="Edit ${esc(t.title)}">⋮</button>
+      </div>
+      <div class="co">${t.project ? esc(t.project.name) : 'No project'}</div>
+      <span class="prio" data-prio="${esc(t.priority)}">${esc(priorityLabel(t.priority))}</span>
+      ${t.status === 'Blocked' && t.blocked_reason
+        ? `<div class="co">Blocked: ${esc(t.blocked_reason)}</div>` : ''}
+      <div class="foot">
+        <span class="when">${t.due_on
+          ? `${over ? 'Overdue' : 'Due'} ${shortDate(t.due_on)}`
+          : timeAgo(t.created_at)}</span>
+        <span class="avatar ${who ? '' : 'light'}" title="${esc(who || 'Unassigned')}">${initials(who)}</span>
+      </div>
+    </article>`;
+}
+
+/**
+ * Move a task to another column. Applied optimistically so the card lands
+ * where you dropped it, then reverted if the write fails.
+ *
+ * The derived fields are mirrored locally to match `derived()` in
+ * admin-shared.js — otherwise a card moved to Done would show as complete
+ * in the wrong column until the next reload.
+ */
+async function moveCard(id, status) {
+  const task = all.find((t) => t.id === id);
+  if (!task || task.status === status) return;
+
+  const before = {
+    status: task.status,
+    completed_at: task.completed_at,
+    blocked_reason: task.blocked_reason,
+  };
+
+  task.status = status;
+  task.completed_at = status === 'Done' ? new Date().toISOString() : null;
+  if (status !== 'Blocked') task.blocked_reason = null;
+  render();
+
+  try {
+    await tasks.setStatus(id, status);
+    /* A blocked card needs its reason, so send them to the sheet. */
+    if (status === 'Blocked') {
+      toast('Marked as blocked — add a reason.');
+      openSheet(task);
+    } else {
+      toast(`Moved to ${status}.`);
+    }
+  } catch (err) {
+    console.error(err);
+    Object.assign(task, before);
+    render();
+    toast(`Could not move that task: ${err.message}`, 'error');
+  }
+}
+
+function renderTable() {
+  const pages = Math.max(1, Math.ceil(view.length / PER_PAGE));
+  if (page > pages) page = pages;
+
+  const start = (page - 1) * PER_PAGE;
+  const slice = view.slice(start, start + PER_PAGE);
+
+  if (!view.length) {
+    $('#rows').innerHTML =
+      `<tr><td colspan="9"><p class="admin-note">
+         ${all.length
+            ? 'No tasks match the current search and filters.'
+            : 'No tasks yet. Use "New Task" to create the first one.'}
+       </p></td></tr>`;
+  } else {
+    $('#rows').innerHTML = slice.map(rowMarkup).join('');
+  }
+
+  const from = view.length ? start + 1 : 0;
+  $('#showing').textContent =
+    `Showing ${from}–${Math.min(start + PER_PAGE, view.length)} of ${view.length} tasks`;
+
+  renderPager('#pager', page, view.length, PER_PAGE, (next) => {
+    page = next;
+    renderTable();
+    $('#table-h').scrollIntoView({ block: 'start' });
+  });
+}
+
+function rowMarkup(t) {
+  const who = t.assignee?.full_name || '';
+  const over = isOverdue(t);
+
+  return `
+    <tr data-id="${t.id}">
+      <td><input type="checkbox" class="row-check" aria-label="Select ${esc(t.title)}"></td>
+      <td class="name">${esc(t.title)}</td>
+      <td>${t.project
+        ? `<button class="linkbtn" data-filter-project="${esc(t.project.id)}"
+                   title="Show only ${esc(t.project.name)}">${esc(t.project.name)}</button>`
+        : '—'}</td>
+      <td><span class="avatar ${who ? '' : 'light'}" title="${esc(who || 'Unassigned')}">${initials(who)}</span></td>
+      <td><span class="badge" data-status="${esc(t.status)}">${esc(t.status)}</span></td>
+      <td><span class="prio" data-prio="${esc(t.priority)}">${esc(priorityLabel(t.priority))}</span></td>
+      <td class="${over ? 'due-over' : ''}">
+        ${shortDate(t.due_on)}${over ? ' · overdue' : ''}
+      </td>
+      <td>${timeAgo(t.created_at)}</td>
+      <td class="actions">
+        <span class="row">
+          <button class="btn sm icon-only" data-act="edit" data-id="${t.id}"
+                  aria-label="Edit ${esc(t.title)}">${icons.kebab}</button>
+        </span>
+      </td>
+    </tr>`;
+}
+
+function renderFilterNote() {
+  const bits = [];
+  if (filters.status)   bits.push(filters.status);
+  if (filters.project)  bits.push(projectOptions.find((p) => p.id === filters.project)?.name ?? 'one project');
+  if (filters.assignee) bits.push(profiles.find((p) => p.id === filters.assignee)?.full_name ?? 'one assignee');
+  if (filters.priority) bits.push(`${priorityLabel(filters.priority)} priority`);
+  if (filters.overdue)  bits.push('overdue');
+
+  if (periodDays > 0) bits.push(`created in last ${periodDays} days`);
+
+  $('#filter-note').textContent = bits.length
+    ? `${view.length} of ${all.length} shown · ${bits.join(' · ')}`
+    : '';
+}
+
+/* ============================================================
+   Controls
+   ============================================================ */
+
+function wireControls() {
+  $('#q').addEventListener('input', debounce(render));
+  $('#period').addEventListener('change', render);
+
+  $$('thead th[data-sort]').forEach((th) => {
+    th.style.cursor = 'pointer';
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortKey = key; sortDir = 'asc'; }
+      render();
+    });
+  });
+
+  $('#check-all').addEventListener('change', (e) => {
+    $$('.row-check').forEach((c) => { c.checked = e.target.checked; });
+  });
+
+  $('#rows').addEventListener('click', (e) => {
+    /* The project cell filters the list rather than opening the sheet. */
+    const jump = e.target.closest('[data-filter-project]');
+    if (jump) {
+      filters.project = jump.dataset.filterProject;
+      $('#f-project-filter').value = filters.project;
+      render();
+      return;
+    }
+
+    const act = e.target.closest('[data-act]');
+    const id  = act?.dataset.id ?? e.target.closest('tr')?.dataset.id;
+    if (!id) return;
+    const task = all.find((t) => t.id === id);
+    if (!task) return;
+
+    if (act?.dataset.act === 'edit') { openSheet(task); return; }
+    if (e.target.closest('a, button, input, label')) return;
+    openSheet(task);
+  });
+
+  /* Pipeline: the kebab edits, and each column's button prefills its
+     own status. */
+  $('#pipeline').addEventListener('click', (e) => {
+    const menu = e.target.closest('[data-menu]');
+    if (menu) { openSheet(all.find((t) => t.id === menu.dataset.menu)); return; }
+
+    const add = e.target.closest('[data-add]');
+    if (add) openSheet(null, add.dataset.add);
+  });
+
+  $('#add-btn').addEventListener('click', () => openSheet(null, 'Todo'));
+  $('#export-btn').addEventListener('click', exportCsv);
+
+  $('#filter-btn').addEventListener('click', () => {
+    const open = $('#filters').classList.toggle('show');
+    $('#filter-btn').setAttribute('aria-expanded', String(open));
+  });
+
+  $('#f-status-filter').addEventListener('change', (e) => {
+    filters.status = e.target.value;
+    render();
+  });
+  $('#f-project-filter').addEventListener('change', (e) => {
+    filters.project = e.target.value;
+    render();
+  });
+  $('#f-assignee-filter').addEventListener('change', (e) => {
+    filters.assignee = e.target.value;
+    render();
+  });
+  $('#f-priority-filter').addEventListener('change', (e) => {
+    filters.priority = e.target.value;
+    render();
+  });
+
+  $('#overdue-btn').addEventListener('click', () => {
+    filters.overdue = !filters.overdue;
+    $('#overdue-btn').setAttribute('aria-pressed', String(filters.overdue));
+    $('#overdue-btn').classList.toggle('clear', filters.overdue);
+    render();
+  });
+
+  $('#filter-clear').addEventListener('click', () => {
+    Object.assign(filters, { status: '', project: '', assignee: '', priority: '', overdue: false });
+    ['#f-status-filter', '#f-project-filter', '#f-assignee-filter', '#f-priority-filter']
+      .forEach((sel) => { $(sel).value = ''; });
+    $('#overdue-btn').setAttribute('aria-pressed', 'false');
+    $('#overdue-btn').classList.remove('clear');
+    $('#period').value = 'all';
+    $('#q').value = '';
+    render();
+  });
+}
+
+/* ============================================================
+   The task sheet
+   ============================================================ */
+
+const SHEET_FIELDS = [
+  ['#f-title', 'title'], ['#f-status', 'status'], ['#f-priority', 'priority'],
+  ['#f-due', 'due_on'], ['#f-blocked', 'blocked_reason'],
+];
+
+/** The blocked reason only applies to a blocked task, so the field
+    appears and disappears with the status. */
+function syncBlockedField() {
+  const blocked = $('#f-status').value === 'Blocked';
+  $('#blocked-field').hidden = !blocked;
+  if (!blocked) $('#f-blocked').value = '';
+}
+
+function openSheet(task = null, presetStatus = 'Todo', presetProject = null) {
+  if (task && !task.id) return;
+  editing = task?.id ?? null;
+
+  const form = $('#task-form');
+  form.reset();
+  $$('.field.invalid', form).forEach((f) => f.classList.remove('invalid'));
+  setStatus($('#task-msg'), '');
+
+  $('#task-modal-h').textContent = task ? 'Edit task' : 'New task';
+  $('#task-modal-sub').textContent = task
+    ? `Update "${task.title}" and save.`
+    : 'Something that needs doing.';
+  $('#task-save').textContent = task ? 'Save changes' : 'Create task';
+  $('#task-delete').hidden = !task;
+
+  for (const [sel, key] of SHEET_FIELDS) {
+    const v = task?.[key];
+    $(sel).value = v == null ? '' : v;
+  }
+
+  if (task) {
+    $('#f-project').value  = task.project?.id ?? '';
+    $('#f-assignee').value = task.assignee?.id ?? '';
+  } else {
+    $('#f-status').value   = presetStatus;
+    $('#f-priority').value = '2';
+    $('#f-project').value  = presetProject ?? '';
+    $('#f-assignee').value = session?.user?.id ?? '';
+  }
+
+  syncBlockedField();
+  openDialog('#task-modal');
+  $('#f-title').focus();
+}
+
+function wireSheet() {
+  $('#task-form').addEventListener('submit', saveSheet);
+  /* Re-evaluate the blocked field whenever the status changes. */
+  $('#f-status').addEventListener('change', syncBlockedField);
+  $('#task-delete').addEventListener('click', () => {
+    const task = all.find((t) => t.id === editing);
+    if (task) removeTask(task);
+  });
+}
+
+async function saveSheet(e) {
+  e.preventDefault();
+
+  const payload = Object.fromEntries(new FormData(e.target).entries());
+  if (!validateSheet(payload)) return;
+
+  const save = $('#task-save');
+  save.disabled = true;
+  setStatus($('#task-msg'), 'Saving…', 'info');
+
+  try {
+    if (editing) {
+      const updated = await tasks.update(editing, payload);
+      const i = all.findIndex((t) => t.id === editing);
+      if (i > -1) all[i] = updated;
+      closeSheet();
+      toast('Task updated.');
+    } else {
+      const created = await tasks.create(payload, session?.user?.id);
+      all.unshift(created);
+      closeSheet();
+      toast('Task created.');
+    }
+    render(true);
+  } catch (err) {
+    console.error(err);
+    setStatus($('#task-msg'), err.message, 'error');
+  } finally {
+    save.disabled = false;
+  }
+}
+
+function validateSheet(payload) {
+  const titleOk = Boolean(String(payload.title ?? '').trim());
+  $('#f-title').closest('.field').classList.toggle('invalid', !titleOk);
+
+  if (!titleOk) { $('#f-title').focus(); return false; }
+  return true;
+}
+
+function closeSheet() {
+  closeDialog('#task-modal');
+  editing = null;
+}
+
+async function removeTask(task) {
+  /* Nothing references tasks, so there is no knock-on to warn about —
+     unlike deleting a project, which takes its tasks with it. */
+  const ok = await confirmDialog({
+    title: 'Delete task',
+    body: dangerBody(task.title),
+    label: 'Delete task',
+  });
+  if (!ok) return;
+
+  try {
+    await tasks.remove(task.id);
+    all = all.filter((t) => t.id !== task.id);
+    closeSheet();
+    render(true);
+    toast('Task deleted.');
+  } catch (err) {
+    console.error(err);
+    toast(`Could not delete that task: ${err.message}`, 'error');
+  }
+}
+
+/* ---------- CSV export ------------------------------------ */
+
+function exportCsv() {
+  if (!view.length) { toast('Nothing to export.'); return; }
+
+  const rows = [['Task', 'Project', 'Assignee', 'Status', 'Priority',
+                 'Due', 'Completed', 'Created', 'Overdue']];
+
+  for (const t of view) {
+    rows.push([t.title, t.project?.name, t.assignee?.full_name, t.status,
+               priorityLabel(t.priority), t.due_on, t.completed_at,
+               t.created_at, isOverdue(t) ? 'yes' : 'no']);
+  }
+
+  downloadCsv(`scope-tasks-${todayIso()}.csv`, rows);
+  toast(`Exported ${view.length} task${view.length === 1 ? '' : 's'}.`);
+}
+</script>
+</body>
+</html>

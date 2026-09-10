@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Clients — SCOPE Internal OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+
+    <main class="page" id="main">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Clients</div>
+          <h1>Clients</h1>
+          <p class="sub">Everyone you have worked with, and what they are worth.</p>
+        </div>
+        <div class="tools">
+          <div class="search">
+            <span class="ico" id="search-ico"></span>
+            <input id="q" type="search" placeholder="Search clients…" aria-label="Search clients">
+          </div>
+          <button class="btn" id="filter-btn" aria-expanded="false">
+            <span id="filter-ico"></span><span>Filter</span>
+          </button>
+          <button class="btn" id="export-btn">
+            <span id="export-ico"></span><span>Export</span>
+          </button>
+          <button class="btn primary" id="add-btn">
+            <span id="add-ico"></span><span>Add Client</span>
+          </button>
+        </div>
+      </div>
+
+      <section class="stats" id="stats" aria-label="Client totals"></section>
+
+      <div class="filters" id="filters">
+        <select class="select" id="f-engagement-filter" aria-label="Filter by engagement">
+          <option value="">All clients</option>
+          <option value="with">Has projects</option>
+          <option value="without">No projects yet</option>
+          <option value="active">Has an active project</option>
+        </select>
+        <span class="active-note" id="filter-note"></span>
+        <button class="btn clear" id="filter-clear">Clear filters</button>
+      </div>
+
+      <section aria-labelledby="table-h">
+        <div class="sec-head">
+          <h2 id="table-h">All Clients</h2>
+          <select class="select" id="period" style="margin-left:auto">
+            <option value="all">All time</option>
+            <option value="30">Added in last 30 days</option>
+            <option value="90">Added in last 90 days</option>
+            <option value="365">Added in last year</option>
+          </select>
+        </div>
+        <p class="sec-sub">A complete list of your clients. Click a row to edit.</p>
+
+        <div class="tablewrap">
+          <div class="scroll-x">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:34px"><input type="checkbox" id="check-all" aria-label="Select all rows"></th>
+                  <th data-sort="name">Client</th>
+                  <th data-sort="company">Company</th>
+                  <th>Contact</th>
+                  <th data-sort="projects" class="num">Projects</th>
+                  <th data-sort="value" class="num">Value</th>
+                  <th data-sort="created_at">Added</th>
+                  <th style="text-align:right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <div class="tablefoot">
+            <span class="showing" id="showing"></span>
+            <div class="pager" id="pager"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- Client sheet -------------------------------------------------- -->
+<div class="modal" id="client-modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="client-modal-h">
+    <form id="client-form" novalidate>
+      <div class="sheet-head">
+        <div>
+          <h2 id="client-modal-h">New client</h2>
+          <p class="sub" id="client-modal-sub">Add someone you work with.</p>
+        </div>
+        <button type="button" class="x" data-close aria-label="Close">×</button>
+      </div>
+
+      <div class="sheet-body">
+        <div class="form-grid">
+          <div class="field">
+            <label for="f-name">Name <span class="req">*</span></label>
+            <input id="f-name" name="name" autocomplete="off" required>
+            <p class="err">A client needs a name.</p>
+          </div>
+          <div class="field">
+            <label for="f-company">Company</label>
+            <input id="f-company" name="company" autocomplete="off">
+          </div>
+
+          <div class="field">
+            <label for="f-email">Email</label>
+            <input id="f-email" name="email" type="email" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="f-phone">Phone</label>
+            <input id="f-phone" name="phone" type="tel" autocomplete="off">
+          </div>
+
+          <div class="field span-2">
+            <label for="f-notes">Notes</label>
+            <textarea id="f-notes" name="notes" rows="3"
+                      placeholder="How you work together, billing details, anything worth remembering…"></textarea>
+          </div>
+        </div>
+
+        <p class="form-msg" id="client-msg" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="sheet-foot">
+        <button type="button" class="btn danger" id="client-delete" hidden>Delete client</button>
+        <span class="push"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary" id="client-save">Save client</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script type="module">
+import { requireSession, clients, esc, money, moneyShort, timeAgo, setStatus,
+         $, $$ } from '../assets/js/admin-shared.js';
+import { mountShell, icons, toast } from '../assets/js/admin-shell.js';
+import { initDialogs, openDialog, closeDialog, confirmDialog, dangerBody,
+         renderPager, debounce, downloadCsv } from '../assets/js/admin-ui.js';
+
+/* ============================================================
+   State
+   ============================================================ */
+
+let all = [];                  // every client from the database
+let view = [];                 // after search + filters
+let sortKey = 'name';
+let sortDir = 'asc';
+let page = 1;
+const PER_PAGE = 10;
+
+const filters = { engagement: '' };
+let editing = null;
+
+/* Engagement buckets, derived from the client's projects. */
+const ENGAGEMENT = {
+  '': () => true,
+  with:    (c) => c.projects.length > 0,
+  without: (c) => c.projects.length === 0,
+  active:  (c) => c.projects.some((p) => p.status === 'Active'),
+};
+const ENGAGEMENT_LABEL = {
+  '': 'All clients',
+  with: 'Has projects',
+  without: 'No projects yet',
+  active: 'Has an active project',
+};
+
+/* ============================================================
+   Boot
+   ============================================================ */
+
+const session = await requireSession();
+if (session) {
+  $('#search-ico').innerHTML = icons.search;
+  $('#filter-ico').innerHTML = icons.filter;
+  $('#export-ico').innerHTML = icons.download;
+  $('#add-ico').innerHTML    = icons.plus;
+
+  await mountShell('clients', session);
+  initDialogs();
+  wireControls();
+  wireSheet();
+  await load();
+}
+
+async function load() {
+  try {
+    all = await clients.list();
+    render();
+  } catch (err) {
+    console.error(err);
+    $('#rows').innerHTML =
+      `<tr><td colspan="8"><p class="admin-note err">
+         Could not load clients: ${esc(err.message)}
+       </p></td></tr>`;
+    $('#stats').innerHTML = '';
+  }
+}
+
+/* ============================================================
+   Derived values
+   ============================================================ */
+
+/** Project count and total budget for one client. */
+function rollup(c) {
+  const projects = c.projects ?? [];
+  return {
+    count: projects.length,
+    value: projects.reduce((t, p) => t + Number(p.budget || 0), 0),
+    active: projects.filter((p) => p.status === 'Active').length,
+    delivered: projects.filter((p) => p.status === 'Delivered').length,
+  };
+}
+
+/* ============================================================
+   Filter + sort
+   ============================================================ */
+
+function applyFilters(keepPage = false) {
+  const q = $('#q').value.trim().toLowerCase();
+  const days = Number($('#period').value);
+  const bucket = ENGAGEMENT[filters.engagement] ?? ENGAGEMENT[''];
+
+  view = all.filter((c) => {
+    if (!bucket(c)) return false;
+
+    if (q) {
+      const hay = [c.name, c.company, c.email, c.phone]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (Number.isFinite(days) && days > 0) {
+      const age = (Date.now() - new Date(c.created_at).getTime()) / 86400000;
+      if (age > days) return false;
+    }
+    return true;
+  });
+
+  const dir = sortDir === 'asc' ? 1 : -1;
+  view.sort((a, b) => {
+    let x, y;
+    if (sortKey === 'projects') { x = rollup(a).count; y = rollup(b).count; }
+    else if (sortKey === 'value') { x = rollup(a).value; y = rollup(b).value; }
+    else { x = a[sortKey]; y = b[sortKey]; }
+
+    if (x == null) x = '';
+    if (y == null) y = '';
+    if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
+    return String(x).localeCompare(String(y)) * dir;
+  });
+
+  if (!keepPage) page = 1;
+}
+
+/* ============================================================
+   Render
+   ============================================================ */
+
+function render(keepPage = false) {
+  applyFilters(keepPage);
+  renderStats();
+  renderTable();
+  renderFilterNote();
+}
+
+function renderStats() {
+  const withProjects = all.filter((c) => rollup(c).count > 0).length;
+  const active = all.reduce((t, c) => t + rollup(c).active, 0);
+  const delivered = all.reduce((t, c) => t + rollup(c).delivered, 0);
+  const value = all.reduce((t, c) => t + rollup(c).value, 0);
+
+  const cards = [
+    { label: 'Total Clients', value: all.length,    icon: 'users',    tint: 'blue'  },
+    { label: 'With Projects', value: withProjects,  icon: 'folder',   tint: 'slate' },
+    { label: 'Active Projects', value: active,      icon: 'trend',    tint: 'green' },
+    { label: 'Delivered',     value: delivered,     icon: 'check',    tint: 'blue'  },
+    /* Sum of every project budget — the only money the schema holds. */
+    { label: 'Contract Value', value: moneyShort(value), icon: 'dollar', tint: 'amber', sm: true },
+  ];
+
+  $('#stats').innerHTML = cards.map((c) => `
+    <div class="stat">
+      <span class="ic tint-${c.tint}">${icons[c.icon]}</span>
+      <span class="body">
+        <span class="val ${c.sm ? 'sm' : ''}">${esc(c.value)}</span>
+        <span class="lbl">${c.label}</span>
+      </span>
+    </div>`).join('');
+}
+
+function renderTable() {
+  const pages = Math.max(1, Math.ceil(view.length / PER_PAGE));
+  if (page > pages) page = pages;
+
+  const start = (page - 1) * PER_PAGE;
+  const slice = view.slice(start, start + PER_PAGE);
+
+  if (!view.length) {
+    $('#rows').innerHTML =
+      `<tr><td colspan="8"><p class="admin-note">
+         ${all.length
+            ? 'No clients match the current search and filters.'
+            : 'No clients yet. Use "Add Client" to create the first one.'}
+       </p></td></tr>`;
+  } else {
+    $('#rows').innerHTML = slice.map(rowMarkup).join('');
+  }
+
+  const from = view.length ? start + 1 : 0;
+  $('#showing').textContent =
+    `Showing ${from}–${Math.min(start + PER_PAGE, view.length)} of ${view.length} clients`;
+
+  renderPager('#pager', page, view.length, PER_PAGE, (next) => {
+    page = next;
+    renderTable();
+    $('#table-h').scrollIntoView({ block: 'start' });
+  });
+}
+
+function rowMarkup(c) {
+  const { count, value } = rollup(c);
+
+  /* Email first, falling back to phone: showing both makes the column
+     wrap on narrow screens for no real gain. */
+  const contact = c.email
+    ? `<a class="link-quiet" href="mailto:${esc(c.email)}" title="${esc(c.email)}">${esc(c.email)}</a>`
+    : c.phone
+      ? `<a class="link-quiet" href="tel:${esc(c.phone)}">${esc(c.phone)}</a>`
+      : '<span style="color:var(--muted)">—</span>';
+
+  return `
+    <tr data-id="${c.id}">
+      <td><input type="checkbox" class="row-check" aria-label="Select ${esc(c.name)}"></td>
+      <td class="name">${esc(c.name)}</td>
+      <td>${esc(c.company || '—')}</td>
+      <td>${contact}</td>
+      <td class="num">${count || '—'}</td>
+      <td class="num">${value ? moneyShort(value) : '—'}</td>
+      <td>${timeAgo(c.created_at)}</td>
+      <td class="actions">
+        <span class="row">
+          <button class="btn sm icon-only" data-act="edit" data-id="${c.id}"
+                  aria-label="Edit ${esc(c.name)}">${icons.kebab}</button>
+        </span>
+      </td>
+    </tr>`;
+}
+
+function renderFilterNote() {
+  const bits = [];
+  if (filters.engagement) bits.push(ENGAGEMENT_LABEL[filters.engagement]);
+  const days = Number($('#period').value);
+  if (Number.isFinite(days) && days > 0) bits.push(`added in last ${days} days`);
+
+  $('#filter-note').textContent = bits.length
+    ? `${view.length} of ${all.length} shown · ${bits.join(' · ')}`
+    : '';
+}
+
+/* ============================================================
+   Controls
+   ============================================================ */
+
+function wireControls() {
+  $('#q').addEventListener('input', debounce(render));
+  $('#period').addEventListener('change', render);
+
+  $$('thead th[data-sort]').forEach((th) => {
+    th.style.cursor = 'pointer';
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortKey = key; sortDir = 'asc'; }
+      render();
+    });
+  });
+
+  $('#check-all').addEventListener('change', (e) => {
+    $$('.row-check').forEach((c) => { c.checked = e.target.checked; });
+  });
+
+  $('#rows').addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]');
+    const id  = act?.dataset.id ?? e.target.closest('tr')?.dataset.id;
+    if (!id) return;
+    const client = all.find((c) => c.id === id);
+    if (!client) return;
+
+    if (act?.dataset.act === 'edit') { openSheet(client); return; }
+    if (e.target.closest('a, button, input, label')) return;   // let mailto: work
+    openSheet(client);
+  });
+
+  $('#add-btn').addEventListener('click', () => openSheet());
+  $('#export-btn').addEventListener('click', exportCsv);
+
+  $('#filter-btn').addEventListener('click', () => {
+    const open = $('#filters').classList.toggle('show');
+    $('#filter-btn').setAttribute('aria-expanded', String(open));
+  });
+
+  $('#f-engagement-filter').addEventListener('change', (e) => {
+    filters.engagement = e.target.value;
+    render();
+  });
+
+  $('#filter-clear').addEventListener('click', () => {
+    filters.engagement = '';
+    $('#f-engagement-filter').value = '';
+    $('#period').value = 'all';
+    $('#q').value = '';
+    render();
+  });
+}
+
+/* ============================================================
+   The client sheet
+   ============================================================ */
+
+const SHEET_FIELDS = [
+  ['#f-name', 'name'], ['#f-company', 'company'],
+  ['#f-email', 'email'], ['#f-phone', 'phone'], ['#f-notes', 'notes'],
+];
+
+function openSheet(client = null) {
+  if (client && !client.id) return;
+  editing = client?.id ?? null;
+
+  const form = $('#client-form');
+  form.reset();
+  $$('.field.invalid', form).forEach((f) => f.classList.remove('invalid'));
+  setStatus($('#client-msg'), '');
+
+  $('#client-modal-h').textContent = client ? 'Edit client' : 'New client';
+  $('#client-modal-sub').textContent = client
+    ? `Update ${client.name} and save.`
+    : 'Add someone you work with.';
+  $('#client-save').textContent = client ? 'Save changes' : 'Create client';
+  $('#client-delete').hidden = !client;
+
+  for (const [sel, key] of SHEET_FIELDS) {
+    const v = client?.[key];
+    $(sel).value = v == null ? '' : v;
+  }
+
+  openDialog('#client-modal');
+  $('#f-name').focus();
+}
+
+function wireSheet() {
+  $('#client-form').addEventListener('submit', saveSheet);
+  $('#client-delete').addEventListener('click', () => {
+    const client = all.find((c) => c.id === editing);
+    if (client) removeClient(client);
+  });
+}
+
+async function saveSheet(e) {
+  e.preventDefault();
+
+  const payload = Object.fromEntries(new FormData(e.target).entries());
+  if (!validateSheet(payload)) return;
+
+  const save = $('#client-save');
+  save.disabled = true;
+  setStatus($('#client-msg'), 'Saving…', 'info');
+
+  try {
+    if (editing) {
+      const updated = await clients.update(editing, payload);
+      const i = all.findIndex((c) => c.id === editing);
+      if (i > -1) all[i] = updated;
+      closeSheet();
+      toast('Client updated.');
+    } else {
+      const created = await clients.create(payload);
+      all.unshift(created);
+      closeSheet();
+      toast('Client added.');
+    }
+    render(true);
+  } catch (err) {
+    console.error(err);
+    setStatus($('#client-msg'), err.message, 'error');
+  } finally {
+    save.disabled = false;
+  }
+}
+
+function validateSheet(payload) {
+  const nameOk = Boolean(String(payload.name ?? '').trim());
+  $('#f-name').closest('.field').classList.toggle('invalid', !nameOk);
+  if (!nameOk) { $('#f-name').focus(); return false; }
+  return true;
+}
+
+function closeSheet() {
+  closeDialog('#client-modal');
+  editing = null;
+}
+
+async function removeClient(client) {
+  const n = rollup(client).count;
+
+  /* projects.client_id is `on delete set null`, so the projects are
+     kept — say so, rather than letting "cannot be undone" imply more
+     than it does. */
+  const consequence = n
+    ? `Their ${n} project${n === 1 ? '' : 's'} will be kept, but ` +
+      `${n === 1 ? 'it' : 'they'} will no longer be linked to a client.`
+    : '';
+
+  const ok = await confirmDialog({
+    title: 'Delete client',
+    body: dangerBody(client.name, consequence),
+    label: 'Delete client',
+  });
+  if (!ok) return;
+
+  try {
+    await clients.remove(client.id);
+    all = all.filter((c) => c.id !== client.id);
+    closeSheet();
+    render(true);
+    toast('Client deleted.');
+  } catch (err) {
+    console.error(err);
+    toast(`Could not delete that client: ${err.message}`, 'error');
+  }
+}
+
+/* ---------- CSV export ------------------------------------ */
+
+function exportCsv() {
+  if (!view.length) { toast('Nothing to export.'); return; }
+
+  const rows = [['Name', 'Company', 'Email', 'Phone', 'Projects', 'Value', 'Added']];
+  for (const c of view) {
+    const { count, value } = rollup(c);
+    rows.push([c.name, c.company, c.email, c.phone, count, value, c.created_at]);
+  }
+
+  downloadCsv(`scope-clients-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  toast(`Exported ${view.length} client${view.length === 1 ? '' : 's'}.`);
+}
+</script>
+</body>
+</html>

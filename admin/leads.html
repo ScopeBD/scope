@@ -1,0 +1,856 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Leads — SCOPE Internal OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+
+    <main class="page" id="main">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Leads</div>
+          <h1>Leads</h1>
+          <p class="sub">Manage your leads, track conversations and convert them into projects.</p>
+        </div>
+        <div class="tools">
+          <div class="search">
+            <span class="ico" id="search-ico"></span>
+            <input id="q" type="search" placeholder="Search leads…" aria-label="Search leads">
+          </div>
+          <button class="btn" id="filter-btn" aria-expanded="false">
+            <span id="filter-ico"></span><span>Filter</span>
+          </button>
+          <button class="btn" id="export-btn">
+            <span id="export-ico"></span><span>Export</span>
+          </button>
+          <button class="btn primary" id="add-btn">
+            <span id="add-ico"></span><span>Add Lead</span>
+          </button>
+        </div>
+      </div>
+
+      <section class="stats" id="stats" aria-label="Lead totals"></section>
+
+      <div class="filters" id="filters">
+        <select class="select" id="f-status-filter" aria-label="Filter by status"></select>
+        <select class="select" id="f-source-filter" aria-label="Filter by source"></select>
+        <span class="active-note" id="filter-note"></span>
+        <button class="btn clear" id="filter-clear">Clear filters</button>
+      </div>
+
+      <section aria-labelledby="pipe-h">
+        <div class="sec-head">
+          <h2 id="pipe-h">Sales Pipeline</h2>
+          <a class="link" href="#table-h">View All →</a>
+        </div>
+        <p class="sec-sub">Drag a lead between columns to move it along the pipeline.</p>
+        <div class="pipeline" id="pipeline"></div>
+      </section>
+
+      <section aria-labelledby="table-h">
+        <div class="sec-head">
+          <h2 id="table-h">All Leads</h2>
+          <select class="select" id="period" style="margin-left:auto">
+            <option value="all">All time</option>
+            <option value="7">Last 7 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select>
+        </div>
+        <p class="sec-sub">A complete list of your leads. Click a row to view details.</p>
+
+        <div class="tablewrap">
+          <div class="scroll-x">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:34px"><input type="checkbox" id="check-all" aria-label="Select all rows"></th>
+                  <th data-sort="name">Name</th>
+                  <th data-sort="company">Company</th>
+                  <th data-sort="source">Source</th>
+                  <th data-sort="budget" class="num">Budget</th>
+                  <th data-sort="status">Status</th>
+                  <th data-sort="next_followup">Next Follow-up</th>
+                  <th>Owner</th>
+                  <th data-sort="created_at">Created</th>
+                  <th style="text-align:right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <div class="tablefoot">
+            <span class="showing" id="showing"></span>
+            <div class="pager" id="pager"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- Lead sheet ---------------------------------------------------- -->
+<div class="modal" id="lead-modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="lead-modal-h">
+    <form id="lead-form" novalidate>
+      <div class="sheet-head">
+        <div>
+          <h2 id="lead-modal-h">New lead</h2>
+          <p class="sub" id="lead-modal-sub">Add someone to the pipeline.</p>
+        </div>
+        <button type="button" class="x" data-close aria-label="Close">×</button>
+      </div>
+
+      <div class="sheet-body">
+        <div class="form-grid">
+          <div class="field">
+            <label for="f-name">Name <span class="req">*</span></label>
+            <input id="f-name" name="name" autocomplete="off" required>
+            <p class="err">A lead needs a name.</p>
+          </div>
+          <div class="field">
+            <label for="f-company">Company</label>
+            <input id="f-company" name="company" autocomplete="off">
+          </div>
+
+          <div class="field">
+            <label for="f-budget">Budget (BDT) <span class="req">*</span></label>
+            <input id="f-budget" name="budget" type="number" min="0" step="0.01" value="0" required>
+            <p class="err">Enter an amount of 0 or more.</p>
+          </div>
+          <div class="field">
+            <label for="f-status">Status</label>
+            <select id="f-status" name="status"></select>
+          </div>
+
+          <div class="field">
+            <label for="f-source">Source</label>
+            <select id="f-source" name="source"></select>
+          </div>
+          <div class="field">
+            <label for="f-followup">Next follow-up</label>
+            <input id="f-followup" name="next_followup" type="date">
+          </div>
+
+          <div class="field">
+            <label for="f-owner">Owner</label>
+            <select id="f-owner" name="owner_id"></select>
+            <p class="hint">Who is chasing this lead.</p>
+          </div>
+          <div class="field">
+            <label for="f-client">Client</label>
+            <select id="f-client" name="client_id"></select>
+            <p class="hint">Link this once the lead becomes a customer.</p>
+          </div>
+
+          <div class="field">
+            <label for="f-email">Email</label>
+            <input id="f-email" name="email" type="email" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="f-phone">Phone</label>
+            <input id="f-phone" name="phone" type="tel" autocomplete="off">
+          </div>
+
+          <div class="field span-2">
+            <label for="f-notes">Notes</label>
+            <textarea id="f-notes" name="notes" rows="3"
+                      placeholder="Where the conversation stands, what they asked for…"></textarea>
+          </div>
+        </div>
+
+        <p class="admin-note" id="lead-converted" hidden></p>
+        <p class="form-msg" id="lead-msg" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="sheet-foot">
+        <button type="button" class="btn danger" id="lead-delete" hidden>Delete lead</button>
+        <button type="button" class="btn" id="lead-convert" hidden>Convert to project</button>
+        <span class="push"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary" id="lead-save">Save lead</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script type="module">
+import { requireSession, leads, projects, fetchProfiles, fetchClientOptions,
+         LEAD_STATUSES, LEAD_SOURCES,
+         esc, money, moneyShort, shortDate, timeAgo, setStatus,
+         $, $$ } from '../assets/js/admin-shared.js';
+import { mountShell, icons, toast, setLeadCount } from '../assets/js/admin-shell.js';
+import { initDialogs, openDialog, closeDialog, confirmDialog, dangerBody,
+         fillSelect, wirePipeline, renderPager, debounce,
+         initials, downloadCsv } from '../assets/js/admin-ui.js';
+
+/* ============================================================
+   State
+   ============================================================ */
+
+/* The pipeline shows every status the lead_status enum allows, so a
+   lead can't be put somewhere the board can't display. */
+const STATUSES = LEAD_STATUSES;
+
+let all = [];                  // every lead from the database
+let view = [];                 // after search + filters
+let profiles = [];             // for the owner picker
+let clientOptions = [];        // for the client picker
+let sortKey = 'created_at';
+let sortDir = 'desc';
+let page = 1;
+const PER_PAGE = 10;
+
+const filters = { status: '', source: '' };
+let editing = null;            // id of the lead in the sheet, null = creating
+
+/* ============================================================
+   Boot
+   ============================================================ */
+
+const session = await requireSession();
+if (session) {
+  $('#search-ico').innerHTML  = icons.search;
+  $('#filter-ico').innerHTML  = icons.filter;
+  $('#export-ico').innerHTML  = icons.download;
+  $('#add-ico').innerHTML     = icons.plus;
+
+  await mountShell('leads', session);
+  initDialogs();
+  fillSelects();
+  wireControls();
+  wireSheet();
+
+  /* These three are independent round trips — don't serialise them. */
+  await Promise.all([load(), loadProfiles(), loadClientOptions()]);
+}
+
+async function load() {
+  try {
+    all = await leads.list();
+    setLeadCount(all.length);
+    render();
+  } catch (err) {
+    console.error(err);
+    $('#rows').innerHTML =
+      `<tr><td colspan="10"><p class="admin-note err">
+         Could not load leads: ${esc(err.message)}
+       </p></td></tr>`;
+    $('#pipeline').innerHTML = '';
+    $('#stats').innerHTML = '';
+  }
+}
+
+/**
+ * The team list for the owner picker. A failure here is not fatal —
+ * the sheet falls back to the signed-in user — so it never blocks the
+ * page from rendering.
+ */
+async function loadProfiles() {
+  try {
+    profiles = await fetchProfiles();
+  } catch (err) {
+    console.error(err);
+    profiles = [];
+  }
+
+  const me = session?.user;
+  if (me && !profiles.some((p) => p.id === me.id)) {
+    profiles.unshift({
+      id: me.id,
+      full_name: me.user_metadata?.full_name?.trim() || me.email || 'You',
+    });
+  }
+  fillOwners();
+}
+
+async function loadClientOptions() {
+  try {
+    clientOptions = await fetchClientOptions();
+  } catch (err) {
+    console.error(err);
+    clientOptions = [];
+  }
+  fillClients();
+}
+
+/* ============================================================
+   Derive the filtered, sorted view
+   ============================================================ */
+
+function applyFilters(keepPage = false) {
+  const q = $('#q').value.trim().toLowerCase();
+  const days = Number($('#period').value);
+
+  view = all.filter((l) => {
+    if (filters.status && l.status !== filters.status) return false;
+    if (filters.source && l.source !== filters.source) return false;
+
+    if (q) {
+      const hay = [l.name, l.company, l.source, l.status, l.owner?.full_name]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (Number.isFinite(days) && days > 0) {
+      const age = (Date.now() - new Date(l.created_at).getTime()) / 86400000;
+      if (age > days) return false;
+    }
+    return true;
+  });
+
+  const dir = sortDir === 'asc' ? 1 : -1;
+  view.sort((a, b) => {
+    let x = sortKey === 'owner' ? a.owner?.full_name : a[sortKey];
+    let y = sortKey === 'owner' ? b.owner?.full_name : b[sortKey];
+    if (x == null) x = '';
+    if (y == null) y = '';
+    if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
+    return String(x).localeCompare(String(y)) * dir;
+  });
+
+  /* Editing a lead on page 3 shouldn't throw you back to page 1. */
+  if (!keepPage) page = 1;
+}
+
+/* ============================================================
+   Render
+   ============================================================ */
+
+function render(keepPage = false) {
+  applyFilters(keepPage);
+  renderStats();
+  renderPipeline();
+  renderTable();
+  renderFilterNote();
+}
+
+function renderStats() {
+  const count = (s) => all.filter((l) => l.status === s).length;
+  const sum   = (s) => all.filter((l) => l.status === s)
+                          .reduce((t, l) => t + Number(l.budget || 0), 0);
+
+  const cards = [
+    { label: 'Total Leads', value: all.length,       icon: 'users',  tint: 'blue'  },
+    { label: 'Contacted',   value: count('Contacted'), icon: 'phone', tint: 'blue'  },
+    { label: 'Meetings',    value: count('Meeting'),   icon: 'calendar', tint: 'amber' },
+    { label: 'Proposals',   value: count('Proposal'),  icon: 'doc',  tint: 'rose'  },
+    { label: 'Won',         value: count('Won'),       icon: 'dollar', tint: 'green' },
+  ];
+
+  const total = all.length || 0;
+  $('#stats').innerHTML = cards.map((c) => {
+    const pct = total ? Math.round((c.value / total) * 100) : 0;
+    return `
+      <div class="stat">
+        <span class="ic tint-${c.tint}">${icons[c.icon]}</span>
+        <span class="body">
+          <span class="val">${c.value}</span>
+          <span class="lbl">${c.label}</span>
+        </span>
+        ${total ? `<span class="delta">↑ ${pct}%</span>` : ''}
+      </div>`;
+  }).join('');
+
+  // Pipeline budget totals are handy context the reference doesn't show,
+  // surfaced as a title attribute so they don't add visual noise.
+  const wonSum = sum('Won');
+  const wonCard = $('#stats .stat:last-child');
+  if (wonCard && wonSum) wonCard.title = `Won budget: ${money(wonSum)}`;
+}
+
+function renderPipeline() {
+  $('#pipeline').innerHTML = STATUSES.map((status) => {
+    const items = all.filter((l) => l.status === status);
+    return `
+      <div class="col" data-status="${status}">
+        <div class="col-head">
+          <span class="name">${status}</span>
+          <span class="n">${items.length}</span>
+        </div>
+        <div class="col-body" data-drop="${status}">
+          ${items.map(cardMarkup).join('')}
+          <button class="add-lead" data-add="${status}">+ Add lead</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  wirePipeline($('#pipeline'), STATUSES, moveCard);
+}
+
+/**
+ * Move a lead to another column. Applied optimistically so the card
+ * lands where you dropped it, then reverted if the write fails.
+ */
+async function moveCard(id, status) {
+  const lead = all.find((l) => l.id === id);
+  if (!lead || lead.status === status) return;
+
+  const previous = lead.status;
+  lead.status = status;
+  render();
+  await persistStatus(id, status, previous);
+}
+
+function cardMarkup(l) {
+  const own = l.owner?.full_name || '';
+
+  /* Only claim "Converted" when a project actually exists. This used to
+     key off `status === 'Won'` alone, so every won lead announced a
+     conversion that had never happened. A won lead with no project is
+     the one that still needs attention, so it says that instead. */
+  const converted = l.projects?.[0] ?? null;
+  const badge = converted
+    ? `<span class="badge" data-status="Won" title="Converted to ${esc(converted.name)}">Converted</span>`
+    : l.status === 'Won'
+      ? '<span class="badge" title="Won, but no project yet — open this lead to convert it">Not converted</span>'
+      : '';
+
+  return `
+    <article class="card" draggable="true" data-id="${l.id}" tabindex="0"
+             aria-label="${esc(l.name)} at ${esc(l.company || 'unknown company')}">
+      <div class="card-top">
+        <span class="nm">${esc(l.name)}</span>
+        <button class="kebab" data-menu="${l.id}" aria-label="Edit ${esc(l.name)}">⋮</button>
+      </div>
+      ${l.company ? `<div class="co">${esc(l.company)}</div>` : ''}
+      <div class="amt">${moneyShort(l.budget)}</div>
+      ${badge}
+      <div class="foot">
+        <span class="when">${timeAgo(l.created_at)}</span>
+        <span class="avatar ${own ? '' : 'light'}" title="${esc(own || 'Unassigned')}">${initials(own)}</span>
+      </div>
+    </article>`;
+}
+
+function renderTable() {
+  /* Deleting or filtering can leave the current page past the end. */
+  const pages = Math.max(1, Math.ceil(view.length / PER_PAGE));
+  if (page > pages) page = pages;
+
+  const start = (page - 1) * PER_PAGE;
+  const slice = view.slice(start, start + PER_PAGE);
+
+  if (!view.length) {
+    $('#rows').innerHTML =
+      `<tr><td colspan="10"><p class="admin-note">
+         ${all.length
+            ? 'No leads match the current search and filters.'
+            : 'No leads yet. Use "Add Lead" to create the first one.'}
+       </p></td></tr>`;
+  } else {
+    $('#rows').innerHTML = slice.map(rowMarkup).join('');
+  }
+
+  const from = view.length ? start + 1 : 0;
+  $('#showing').textContent =
+    `Showing ${from}–${Math.min(start + PER_PAGE, view.length)} of ${view.length} leads`;
+
+  renderPager('#pager', page, view.length, PER_PAGE, (next) => {
+    page = next;
+    renderTable();
+    $('#table-h').scrollIntoView({ block: 'start' });
+  });
+}
+
+function rowMarkup(l) {
+  const own = l.owner?.full_name || '';
+
+  /* Call and email are real links when there's something to dial, and
+     fall back to opening the sheet when the field is still empty —
+     better than a toast pretending to make a call. */
+  const contact = (kind, value) => {
+    const label = kind === 'call' ? 'Call' : 'Email';
+    const icon  = kind === 'call' ? icons.phone : icons.mail;
+    return value
+      ? `<a class="btn sm icon-only" href="${kind === 'call' ? 'tel' : 'mailto'}:${esc(value)}"
+            aria-label="${label} ${esc(l.name)}" title="${esc(value)}">${icon}</a>`
+      : `<button class="btn sm icon-only" data-act="edit" data-id="${l.id}"
+            aria-label="No ${kind === 'call' ? 'phone number' : 'email'} for ${esc(l.name)} — open the editor"
+            title="No ${kind === 'call' ? 'phone number' : 'email'} saved">${icon}</button>`;
+  };
+
+  return `
+    <tr data-id="${l.id}">
+      <td><input type="checkbox" class="row-check" aria-label="Select ${esc(l.name)}"></td>
+      <td class="name">${esc(l.name)}</td>
+      <td>${esc(l.company || '—')}</td>
+      <td>${esc(l.source || '—')}</td>
+      <td class="num">${moneyShort(l.budget)}</td>
+      <td><span class="badge" data-status="${esc(l.status)}">${esc(l.status)}</span></td>
+      <td>${shortDate(l.next_followup)}</td>
+      <td><span class="avatar ${own ? '' : 'light'}" title="${esc(own || 'Unassigned')}">${initials(own)}</span></td>
+      <td>${timeAgo(l.created_at)}</td>
+      <td class="actions">
+        <span class="row">
+          ${contact('call', l.phone)}
+          ${contact('mail', l.email)}
+          <button class="btn sm icon-only" data-act="edit" data-id="${l.id}"
+                  aria-label="Edit ${esc(l.name)}">${icons.kebab}</button>
+        </span>
+      </td>
+    </tr>`;
+}
+
+function renderFilterNote() {
+  const active = [filters.status, filters.source].filter(Boolean).length;
+  const days = Number($('#period').value);
+  const bits = [];
+  if (active) bits.push(`${active} filter${active === 1 ? '' : 's'}`);
+  if (Number.isFinite(days) && days > 0) bits.push(`last ${days} days`);
+  $('#filter-note').textContent = bits.length
+    ? `${view.length} of ${all.length} shown · ${bits.join(' · ')}`
+    : '';
+}
+
+/* ============================================================
+   Controls
+   ============================================================ */
+
+function wireControls() {
+  $('#q').addEventListener('input', debounce(render));
+
+  $('#period').addEventListener('change', render);
+
+  $$('thead th[data-sort]').forEach((th) => {
+    th.style.cursor = 'pointer';
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortKey = key; sortDir = 'asc'; }
+      render();
+    });
+  });
+
+  $('#check-all').addEventListener('change', (e) => {
+    $$('.row-check').forEach((c) => { c.checked = e.target.checked; });
+  });
+
+  /* One delegated handler for the table: row actions, and a click
+     anywhere else on the row opens the editor (the section's copy
+     promises this, so it had better be true). */
+  $('#rows').addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]');
+    const id  = act?.dataset.id ?? e.target.closest('tr')?.dataset.id;
+    if (!id) return;
+    const lead = all.find((l) => l.id === id);
+    if (!lead) return;
+
+    if (act?.dataset.act === 'edit') { openSheet(lead); return; }
+    if (e.target.closest('a, button, input, label')) return;  // let links behave
+    openSheet(lead);
+  });
+
+  /* Pipeline cards: the kebab edits, and "+ Add lead" prefills the
+     status of the column it sits in. */
+  $('#pipeline').addEventListener('click', (e) => {
+    const menu = e.target.closest('[data-menu]');
+    if (menu) { openSheet(all.find((l) => l.id === menu.dataset.menu)); return; }
+
+    const add = e.target.closest('[data-add]');
+    if (add) openSheet(null, add.dataset.add);
+  });
+
+  $('#add-btn').addEventListener('click', () => openSheet(null, 'New'));
+  $('#export-btn').addEventListener('click', exportCsv);
+
+  /* Filter bar */
+  $('#filter-btn').addEventListener('click', () => {
+    const open = $('#filters').classList.toggle('show');
+    $('#filter-btn').setAttribute('aria-expanded', String(open));
+  });
+
+  $('#f-status-filter').addEventListener('change', (e) => {
+    filters.status = e.target.value;
+    render();
+  });
+  $('#f-source-filter').addEventListener('change', (e) => {
+    filters.source = e.target.value;
+    render();
+  });
+  $('#filter-clear').addEventListener('click', () => {
+    filters.status = '';
+    filters.source = '';
+    $('#f-status-filter').value = '';
+    $('#f-source-filter').value = '';
+    $('#period').value = 'all';
+    $('#q').value = '';
+    render();
+  });
+}
+
+/* ============================================================
+   Selects
+   ============================================================ */
+
+function fillSelects() {
+  fillSelect('#f-status', LEAD_STATUSES);
+  fillSelect('#f-source', LEAD_SOURCES, '—');
+  fillSelect('#f-status-filter', LEAD_STATUSES, 'All statuses');
+  fillSelect('#f-source-filter', LEAD_SOURCES, 'All sources');
+}
+
+function fillOwners() {
+  fillPicker('#f-owner', profiles, 'Unassigned', (p) => p.full_name || 'Unnamed');
+}
+
+function fillClients() {
+  fillPicker('#f-client', clientOptions, 'No client', (c) => c.name);
+}
+
+/** Fill a <select> of records, keeping whatever is currently chosen. */
+function fillPicker(sel, list, blank, label) {
+  const el = $(sel);
+  if (!el) return;
+  const current = el.value;
+  el.innerHTML = `<option value="">${esc(blank)}</option>` +
+    list.map((r) => `<option value="${esc(r.id)}">${esc(label(r))}</option>`).join('');
+  el.value = current;
+}
+
+/* ============================================================
+   The lead sheet — create, edit, delete
+   ============================================================ */
+
+const SHEET_FIELDS = [
+  ['#f-name', 'name'], ['#f-company', 'company'], ['#f-budget', 'budget'],
+  ['#f-status', 'status'], ['#f-source', 'source'], ['#f-followup', 'next_followup'],
+  ['#f-email', 'email'], ['#f-phone', 'phone'], ['#f-notes', 'notes'],
+];
+
+function openSheet(lead = null, presetStatus = 'New') {
+  if (lead && !lead.id) return;               // id looked up but not found
+  editing = lead?.id ?? null;
+
+  const form = $('#lead-form');
+  form.reset();
+  $$('.field.invalid', form).forEach((f) => f.classList.remove('invalid'));
+  setStatus($('#lead-msg'), '');
+
+  $('#lead-modal-h').textContent = lead ? 'Edit lead' : 'New lead';
+  $('#lead-modal-sub').textContent = lead
+    ? `Update ${lead.name} and save.`
+    : 'Add someone to the pipeline.';
+  $('#lead-save').textContent = lead ? 'Save changes' : 'Create lead';
+  $('#lead-delete').hidden = !lead;
+
+  for (const [sel, key] of SHEET_FIELDS) {
+    const v = lead?.[key];
+    $(sel).value = v == null ? '' : v;
+  }
+
+  if (lead) {
+    $('#f-owner').value  = lead.owner?.id ?? '';
+    $('#f-client').value = lead.client?.id ?? '';
+  } else {
+    $('#f-budget').value = '0';
+    $('#f-status').value = presetStatus;
+    $('#f-owner').value  = session?.user?.id ?? '';
+  }
+
+  /* Converting means something only for a Won lead that has no project
+     yet. An already-converted lead gets a link to the project instead,
+     so the state is visible rather than an error on pressing the button. */
+  const converted = lead?.projects?.[0] ?? null;
+  $('#lead-convert').hidden = !(lead && lead.status === 'Won' && !converted);
+
+  const note = $('#lead-converted');
+  note.hidden = !converted;
+  note.innerHTML = converted
+    ? `Converted to <a href="projects.html">${esc(converted.name)}</a> ↗`
+    : '';
+
+  openDialog('#lead-modal');
+  $('#f-name').focus();
+}
+
+function wireSheet() {
+  $('#lead-form').addEventListener('submit', saveSheet);
+  $('#lead-delete').addEventListener('click', () => {
+    const lead = all.find((l) => l.id === editing);
+    if (lead) removeLead(lead);
+  });
+  $('#lead-convert').addEventListener('click', () => {
+    const lead = all.find((l) => l.id === editing);
+    if (lead) convertLead(lead);
+  });
+}
+
+/** Validate, then create or update. One sheet serves both. */
+async function saveSheet(e) {
+  e.preventDefault();
+
+  const payload = Object.fromEntries(new FormData(e.target).entries());
+  if (!validateSheet(payload)) return;
+
+  const save = $('#lead-save');
+  save.disabled = true;
+  setStatus($('#lead-msg'), 'Saving…', 'info');
+
+  try {
+    if (editing) {
+      const updated = await leads.update(editing, payload);
+      const i = all.findIndex((l) => l.id === editing);
+      if (i > -1) all[i] = updated;
+      closeSheet();
+      toast('Lead updated.');
+    } else {
+      const created = await leads.create(payload, session?.user?.id);
+      all.unshift(created);
+      closeSheet();
+      toast('Lead added.');
+    }
+    setLeadCount(all.length);
+    render(true);                 // stay on the current page
+  } catch (err) {
+    console.error(err);
+    setStatus($('#lead-msg'), err.message, 'error');
+  } finally {
+    save.disabled = false;
+  }
+}
+
+/** Field-level checks, so the message lands under the offending input. */
+function validateSheet(payload) {
+  const nameOk = Boolean(String(payload.name ?? '').trim());
+  const budget = Number(payload.budget);
+  const budgetOk = String(payload.budget ?? '').trim() !== ''
+    && Number.isFinite(budget) && budget >= 0;
+
+  $('#f-name').closest('.field').classList.toggle('invalid', !nameOk);
+  $('#f-budget').closest('.field').classList.toggle('invalid', !budgetOk);
+
+  if (!nameOk) { $('#f-name').focus(); return false; }
+  if (!budgetOk) { $('#f-budget').focus(); return false; }
+  return true;
+}
+
+function closeSheet() {
+  closeDialog('#lead-modal');
+  editing = null;
+}
+
+async function removeLead(lead) {
+  const ok = await confirmDialog({
+    title: 'Delete lead',
+    body: dangerBody(lead.name, lead.company ? `This is the lead at ${esc(lead.company)}.` : ''),
+    label: 'Delete lead',
+  });
+  if (!ok) return;
+
+  try {
+    await leads.remove(lead.id);
+    all = all.filter((l) => l.id !== lead.id);
+    setLeadCount(all.length);
+    closeSheet();
+    render(true);
+    toast('Lead deleted.');
+  } catch (err) {
+    console.error(err);
+    toast(`Could not delete that lead: ${err.message}`, 'error');
+  }
+}
+
+/* ---------- conversion ------------------------------------ */
+
+/**
+ * Turn a Won lead into a project.
+ *
+ * Confirms first — it creates a record on another page that the user
+ * would otherwise have to go and find — and states what is carried over
+ * so the result is not a surprise. The link back to the lead is the part
+ * that cannot be reconstructed later, so the dialog says it out loud.
+ */
+async function convertLead(lead) {
+  /* The list in memory can be stale — someone may have converted this
+     already, or the button may have been double-pressed. */
+  if (lead.projects?.length) {
+    toast('That lead has already been converted.');
+    return;
+  }
+
+  const hasClient = Boolean(lead.client?.id || lead.client_id);
+  const body =
+    `Creates a project called <b>${esc(lead.company || lead.name)}</b>`
+    + (Number(lead.budget) > 0 ? ` with a budget of <b>${esc(money(lead.budget))}</b>` : '')
+    + `, linked back to ${esc(lead.name)} so the lead source stays attached.`
+    + (hasClient
+        ? ''
+        : ' This lead has no client yet, so the project starts unlinked —'
+          + ' you can set one on the Projects page.');
+
+  const ok = await confirmDialog({ title: 'Convert to project', body, label: 'Convert' });
+  if (!ok) return;
+
+  const btn = $('#lead-convert');
+  btn.disabled = true;
+  setStatus($('#lead-msg'), 'Converting…', 'info');
+
+  try {
+    const project = await projects.convertFrom(lead, session?.user?.id);
+
+    /* Splice the new link into the list rather than refetching — the card
+       badge and this sheet both read the conversion from here. */
+    const i = all.findIndex((l) => l.id === lead.id);
+    if (i > -1) all[i] = { ...all[i], projects: [{ id: project.id, name: project.name }] };
+
+    closeSheet();
+    render(true);
+    toast(`Project created: ${project.name}`);
+  } catch (err) {
+    console.error(err);
+    setStatus($('#lead-msg'), err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ---------- CSV export ------------------------------------ */
+
+function exportCsv() {
+  if (!view.length) { toast('Nothing to export.'); return; }
+
+  const rows = [['Name', 'Company', 'Source', 'Budget', 'Status',
+                 'Next follow-up', 'Owner', 'Created']];
+
+  for (const l of view) {
+    rows.push([l.name, l.company, l.source, l.budget, l.status,
+               l.next_followup, l.owner?.full_name, l.created_at]);
+  }
+
+  downloadCsv(`scope-leads-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  toast(`Exported ${view.length} lead${view.length === 1 ? '' : 's'}.`);
+}
+
+/* ---------- pipeline moves -------------------------------- */
+
+async function persistStatus(id, status, previous) {
+  try {
+    await leads.setStatus(id, status);
+    toast(`Moved to ${status}.`);
+  } catch (err) {
+    console.error(err);
+    const lead = all.find((l) => l.id === id);
+    if (lead) lead.status = previous;      // put it back where it was
+    render();
+    toast(`Could not move that lead: ${err.message}`, 'error');
+  }
+}
+</script>
+</body>
+</html>

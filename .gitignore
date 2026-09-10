@@ -1,2 +1,11 @@
 # agent/tooling state — not part of the website
 .commandcode/
+
+# Machine-specific settings. The shared .claude/settings.json (which
+# registers the tools/check.js hook) IS committed — the other two are not.
+.claude/settings.local.json
+
+# Design references. Nothing loads these, and README §1 says they are
+# safe to delete. Kept on disk, kept out of history.
+_ref_*.png
+*.jfif

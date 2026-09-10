@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Sign in — SCOPE Internal OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body>
+
+<main class="login-wrap">
+  <div class="login-card">
+    <img src="../assets/logo-480.png" alt="SCOPE">
+
+    <h1>Internal OS</h1>
+    <p class="sub">Sign in to reach the admin panel.</p>
+
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="username"
+               required autofocus>
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password"
+               autocomplete="current-password" required>
+      </div>
+
+      <button class="btn primary" type="submit" id="submit">Sign in</button>
+      <p class="form-msg" id="msg" role="status" aria-live="polite"></p>
+    </form>
+
+    <p class="login-foot">SCOPE — Build · Automate · Grow</p>
+  </div>
+</main>
+
+<script type="module">
+import { supabase } from '../assets/js/admin-client.js';
+import { $, setStatus } from '../assets/js/admin-shared.js';
+
+const form  = $('#login-form');
+const msg   = $('#msg');
+const btn   = $('#submit');
+
+/* Where to land after a successful sign-in. Only same-directory page
+   names are honoured, so a crafted ?next= can't bounce you off-site. */
+const rawNext = new URLSearchParams(location.search).get('next') || 'index.html';
+const next = /^[a-z0-9_-]+\.html$/i.test(rawNext) ? rawNext : 'index.html';
+
+/* Already signed in? Skip the form entirely. */
+const { data: { session } } = await supabase.auth.getSession();
+if (session) location.replace(next);
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = $('#email').value.trim();
+  const password = $('#password').value;
+
+  if (!email || !password) {
+    setStatus(msg, 'Enter both your email and password.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  setStatus(msg, '');
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    // Supabase reports every credential problem as "Invalid login
+    // credentials" on purpose — it refuses to reveal which addresses
+    // exist. The email-not-confirmed case is worth spelling out
+    // though, because it's the usual cause and the fix isn't obvious.
+    const unconfirmed = /confirm/i.test(error.message);
+    setStatus(
+      msg,
+      unconfirmed
+        ? 'This account exists but its email is not confirmed yet. In Supabase, open Authentication → Users and either confirm this user or disable "Confirm email" under Sign In / Providers → Email.'
+        : 'That email and password combination did not work.',
+      'error'
+    );
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+    return;
+  }
+
+  setStatus(msg, 'Signed in. Loading…', 'ok');
+  location.replace(next);
+});
+</script>
+</body>
+</html>

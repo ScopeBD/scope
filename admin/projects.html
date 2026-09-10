@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Projects — SCOPE Internal OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" sizes="32x32" href="../favicon-32.png">
+<link rel="stylesheet" href="../assets/css/admin.css">
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+
+  <div class="main">
+    <header class="topbar" id="topbar"></header>
+
+    <main class="page" id="main">
+      <div class="page-head">
+        <div>
+          <div class="eyebrow">Projects</div>
+          <h1>Projects</h1>
+          <p class="sub">Everything in flight, what it is worth, and when it is due.</p>
+        </div>
+        <div class="tools">
+          <div class="search">
+            <span class="ico" id="search-ico"></span>
+            <input id="q" type="search" placeholder="Search projects…" aria-label="Search projects">
+          </div>
+          <button class="btn" id="filter-btn" aria-expanded="false">
+            <span id="filter-ico"></span><span>Filter</span>
+          </button>
+          <button class="btn" id="export-btn">
+            <span id="export-ico"></span><span>Export</span>
+          </button>
+          <button class="btn primary" id="add-btn">
+            <span id="add-ico"></span><span>New Project</span>
+          </button>
+        </div>
+      </div>
+
+      <section class="stats" id="stats" aria-label="Project totals"></section>
+
+      <div class="filters" id="filters">
+        <select class="select" id="f-status-filter" aria-label="Filter by status"></select>
+        <select class="select" id="f-client-filter" aria-label="Filter by client"></select>
+        <span class="active-note" id="filter-note"></span>
+        <button class="btn clear" id="filter-clear">Clear filters</button>
+      </div>
+
+      <section aria-labelledby="pipe-h">
+        <div class="sec-head">
+          <h2 id="pipe-h">Delivery Pipeline</h2>
+          <a class="link" href="#table-h">View All →</a>
+        </div>
+        <p class="sec-sub">Drag a project between columns to change its stage.</p>
+        <div class="pipeline" id="pipeline"></div>
+      </section>
+
+      <section aria-labelledby="table-h">
+        <div class="sec-head">
+          <h2 id="table-h">All Projects</h2>
+          <select class="select" id="period" style="margin-left:auto">
+            <option value="all">All time</option>
+            <option value="30">Created in last 30 days</option>
+            <option value="90">Created in last 90 days</option>
+            <option value="365">Created in last year</option>
+          </select>
+        </div>
+        <p class="sec-sub">A complete list of your projects. Click a row to edit.</p>
+
+        <div class="tablewrap">
+          <div class="scroll-x">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:34px"><input type="checkbox" id="check-all" aria-label="Select all rows"></th>
+                  <th data-sort="name">Project</th>
+                  <th data-sort="client">Client</th>
+                  <th>Owner</th>
+                  <th data-sort="status">Status</th>
+                  <th data-sort="budget" class="num">Budget</th>
+                  <th data-sort="started_on">Start</th>
+                  <th data-sort="due_on">Due</th>
+                  <th>Tasks</th>
+                  <th style="text-align:right">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <div class="tablefoot">
+            <span class="showing" id="showing"></span>
+            <div class="pager" id="pager"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- Project sheet ------------------------------------------------- -->
+<div class="modal" id="project-modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="project-modal-h">
+    <form id="project-form" novalidate>
+      <div class="sheet-head">
+        <div>
+          <h2 id="project-modal-h">New project</h2>
+          <p class="sub" id="project-modal-sub">Start tracking a piece of work.</p>
+        </div>
+        <button type="button" class="x" data-close aria-label="Close">×</button>
+      </div>
+
+      <div class="sheet-body">
+        <div class="form-grid">
+          <div class="field span-2">
+            <label for="f-name">Project name <span class="req">*</span></label>
+            <input id="f-name" name="name" autocomplete="off" required>
+            <p class="err">A project needs a name.</p>
+          </div>
+
+          <div class="field">
+            <label for="f-client">Client</label>
+            <select id="f-client" name="client_id"></select>
+          </div>
+          <div class="field">
+            <label for="f-owner">Owner</label>
+            <select id="f-owner" name="owner_id"></select>
+            <p class="hint">Who is accountable for delivery.</p>
+          </div>
+
+          <div class="field">
+            <label for="f-status">Status</label>
+            <select id="f-status" name="status"></select>
+          </div>
+          <div class="field">
+            <label for="f-budget">Budget (BDT) <span class="req">*</span></label>
+            <input id="f-budget" name="budget" type="number" min="0" step="0.01" value="0" required>
+            <p class="err">Enter an amount of 0 or more.</p>
+          </div>
+
+          <div class="field">
+            <label for="f-started">Started</label>
+            <input id="f-started" name="started_on" type="date">
+          </div>
+          <div class="field">
+            <label for="f-due">Due</label>
+            <input id="f-due" name="due_on" type="date">
+          </div>
+
+          <div class="field span-2">
+            <label for="f-delivered">Delivered</label>
+            <input id="f-delivered" name="delivered_on" type="date">
+            <p class="hint">Set this when the work is signed off.</p>
+          </div>
+
+          <div class="field span-2">
+            <label for="f-notes">Notes</label>
+            <textarea id="f-notes" name="notes" rows="3"
+                      placeholder="Scope, deliverables, anything the team needs to know…"></textarea>
+          </div>
+        </div>
+
+        <p class="admin-note" id="project-lead" hidden></p>
+        <p class="form-msg" id="project-msg" role="status" aria-live="polite"></p>
+      </div>
+
+      <div class="sheet-foot">
+        <button type="button" class="btn danger" id="project-delete" hidden>Delete project</button>
+        <span class="push"></span>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn primary" id="project-save">Save project</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script type="module">
+import { requireSession, projects, fetchProfiles, fetchClientOptions,
+         PROJECT_STATUSES, esc, moneyShort, shortDate, timeAgo, setStatus,
+         $, $$ } from '../assets/js/admin-shared.js';
+import { mountShell, icons, toast } from '../assets/js/admin-shell.js';
+import { initDialogs, openDialog, closeDialog, confirmDialog, dangerBody,
+         fillSelect, wirePipeline, renderPager, debounce,
+         initials, downloadCsv } from '../assets/js/admin-ui.js';
+
+/* ============================================================
+   State
+   ============================================================ */
+
+const STATUSES = PROJECT_STATUSES;
+
+let all = [];                  // every project from the database
+let view = [];                 // after search + filters
+let profiles = [];             // owner picker
+let clientOptions = [];        // client picker + client filter
+let sortKey = 'created_at';
+let sortDir = 'desc';
+let page = 1;
+const PER_PAGE = 10;
+
+const filters = { status: '', client: '' };
+let editing = null;
+
+/* ============================================================
+   Boot
+   ============================================================ */
+
+const session = await requireSession();
+if (session) {
+  $('#search-ico').innerHTML = icons.search;
+  $('#filter-ico').innerHTML = icons.filter;
+  $('#export-ico').innerHTML = icons.download;
+  $('#add-ico').innerHTML    = icons.plus;
+
+  await mountShell('projects', session);
+  initDialogs();
+  fillSelect('#f-status', PROJECT_STATUSES);
+  fillSelect('#f-status-filter', PROJECT_STATUSES, 'All statuses');
+  wireControls();
+  wireSheet();
+
+  /* Independent round trips — don't serialise them. */
+  await Promise.all([load(), loadProfiles(), loadClientOptions()]);
+
+  /* Arrived from the Command Center's "New project": open the sheet so
+     the button does what it says. */
+  if (new URLSearchParams(location.search).get('new')) {
+    openSheet(null, 'Planning');
+    /* Drop the flag so a reload doesn't reopen it. */
+    history.replaceState(null, '', location.pathname);
+  }
+}
+
+async function load() {
+  try {
+    all = await projects.list();
+    render();
+  } catch (err) {
+    console.error(err);
+    $('#rows').innerHTML =
+      `<tr><td colspan="10"><p class="admin-note err">
+         Could not load projects: ${esc(err.message)}
+       </p></td></tr>`;
+    $('#pipeline').innerHTML = '';
+    $('#stats').innerHTML = '';
+  }
+}
+
+async function loadProfiles() {
+  try {
+    profiles = await fetchProfiles();
+  } catch (err) {
+    console.error(err);
+    profiles = [];
+  }
+
+  const me = session?.user;
+  if (me && !profiles.some((p) => p.id === me.id)) {
+    profiles.unshift({
+      id: me.id,
+      full_name: me.user_metadata?.full_name?.trim() || me.email || 'You',
+    });
+  }
+  fillPicker('#f-owner', profiles, 'Unassigned', (p) => p.full_name || 'Unnamed');
+}
+
+async function loadClientOptions() {
+  try {
+    clientOptions = await fetchClientOptions();
+  } catch (err) {
+    console.error(err);
+    clientOptions = [];
+  }
+  fillPicker('#f-client', clientOptions, 'No client', (c) => c.name);
+  fillPicker('#f-client-filter', clientOptions, 'All clients', (c) => c.name);
+}
+
+/** Fill a <select> of records, keeping whatever is currently chosen. */
+function fillPicker(sel, list, blank, label) {
+  const el = $(sel);
+  if (!el) return;
+  const current = el.value;
+  el.innerHTML = `<option value="">${esc(blank)}</option>` +
+    list.map((r) => `<option value="${esc(r.id)}">${esc(label(r))}</option>`).join('');
+  el.value = current;
+}
+
+/* ============================================================
+   Derived values
+   ============================================================ */
+
+function taskInfo(p) {
+  const tasks = p.tasks ?? [];
+  return {
+    total: tasks.length,
+    done: tasks.filter((t) => t.status === 'Done').length,
+  };
+}
+
+/** A project is overdue when it is past due and not yet delivered. */
+function isOverdue(p) {
+  if (!p.due_on) return false;
+  if (p.status === 'Delivered' || p.status === 'Cancelled') return false;
+  return p.due_on < new Date().toISOString().slice(0, 10);
+}
+
+/* ============================================================
+   Filter + sort
+   ============================================================ */
+
+function applyFilters(keepPage = false) {
+  const q = $('#q').value.trim().toLowerCase();
+  const days = Number($('#period').value);
+
+  view = all.filter((p) => {
+    if (filters.status && p.status !== filters.status) return false;
+    if (filters.client && p.client?.id !== filters.client) return false;
+
+    if (q) {
+      const hay = [p.name, p.client?.name, p.owner?.full_name, p.status, p.notes]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (Number.isFinite(days) && days > 0) {
+      const age = (Date.now() - new Date(p.created_at).getTime()) / 86400000;
+      if (age > days) return false;
+    }
+    return true;
+  });
+
+  const dir = sortDir === 'asc' ? 1 : -1;
+  view.sort((a, b) => {
+    let x = sortKey === 'client' ? a.client?.name : a[sortKey];
+    let y = sortKey === 'client' ? b.client?.name : b[sortKey];
+    if (x == null) x = '';
+    if (y == null) y = '';
+    if (typeof x === 'number' && typeof y === 'number') return (x - y) * dir;
+    return String(x).localeCompare(String(y)) * dir;
+  });
+
+  if (!keepPage) page = 1;
+}
+
+/* ============================================================
+   Render
+   ============================================================ */
+
+function render(keepPage = false) {
+  applyFilters(keepPage);
+  renderStats();
+  renderPipeline();
+  renderTable();
+  renderFilterNote();
+}
+
+function renderStats() {
+  const count = (s) => all.filter((p) => p.status === s).length;
+  const value = all.reduce((t, p) => t + Number(p.budget || 0), 0);
+
+  const cards = [
+    { label: 'Total Projects', value: all.length,       icon: 'folder', tint: 'blue'  },
+    { label: 'Active',    value: count('Active'),       icon: 'trend',  tint: 'green' },
+    { label: 'Planning',  value: count('Planning'),     icon: 'doc',    tint: 'slate' },
+    { label: 'Delivered', value: count('Delivered'),    icon: 'check',  tint: 'blue'  },
+    { label: 'Total Value', value: moneyShort(value),   icon: 'dollar', tint: 'amber', sm: true },
+  ];
+
+  const overdue = all.filter(isOverdue).length;
+
+  $('#stats').innerHTML = cards.map((c) => `
+    <div class="stat">
+      <span class="ic tint-${c.tint}">${icons[c.icon]}</span>
+      <span class="body">
+        <span class="val ${c.sm ? 'sm' : ''}">${esc(c.value)}</span>
+        <span class="lbl">${c.label}</span>
+      </span>
+    </div>`).join('');
+
+  if (overdue) {
+    const card = $('#stats .stat:first-child');
+    if (card) card.title = `${overdue} project${overdue === 1 ? '' : 's'} past due`;
+  }
+}
+
+function renderPipeline() {
+  $('#pipeline').innerHTML = STATUSES.map((status) => {
+    const items = all.filter((p) => p.status === status);
+    return `
+      <div class="col" data-status="${esc(status)}">
+        <div class="col-head">
+          <span class="name">${esc(status)}</span>
+          <span class="n">${items.length}</span>
+        </div>
+        <div class="col-body" data-drop="${esc(status)}">
+          ${items.map(cardMarkup).join('')}
+          <button class="add-lead" data-add="${esc(status)}">+ New project</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  wirePipeline($('#pipeline'), STATUSES, moveCard);
+}
+
+function cardMarkup(p) {
+  const own = p.owner?.full_name || '';
+  const { total, done } = taskInfo(p);
+  return `
+    <article class="card" draggable="true" data-id="${p.id}" tabindex="0"
+             aria-label="${esc(p.name)} for ${esc(p.client?.name || 'no client')}">
+      <div class="card-top">
+        <span class="nm">${esc(p.name)}</span>
+        <button class="kebab" data-menu="${p.id}" aria-label="Edit ${esc(p.name)}">⋮</button>
+      </div>
+      ${p.client ? `<div class="co">${esc(p.client.name)}</div>` : ''}
+      <div class="amt">${moneyShort(p.budget)}</div>
+      ${isOverdue(p) ? '<span class="badge tint-rose" style="border-radius:999px">Overdue</span>' : ''}
+      ${total ? `<div class="co">${done}/${total} tasks done</div>` : ''}
+      <div class="foot">
+        <span class="when">${p.due_on ? `Due ${shortDate(p.due_on)}` : timeAgo(p.created_at)}</span>
+        <span class="avatar ${own ? '' : 'light'}" title="${esc(own || 'Unassigned')}">${initials(own)}</span>
+      </div>
+    </article>`;
+}
+
+/**
+ * Move a project to another column. Applied optimistically so the card
+ * lands where you dropped it, then reverted if the write fails.
+ */
+async function moveCard(id, status) {
+  const project = all.find((p) => p.id === id);
+  if (!project || project.status === status) return;
+
+  const previous = project.status;
+  project.status = status;
+  render();
+
+  try {
+    await projects.setStatus(id, status);
+    toast(`Moved to ${status}.`);
+  } catch (err) {
+    console.error(err);
+    project.status = previous;
+    render();
+    toast(`Could not move that project: ${err.message}`, 'error');
+  }
+}
+
+function renderTable() {
+  const pages = Math.max(1, Math.ceil(view.length / PER_PAGE));
+  if (page > pages) page = pages;
+
+  const start = (page - 1) * PER_PAGE;
+  const slice = view.slice(start, start + PER_PAGE);
+
+  if (!view.length) {
+    $('#rows').innerHTML =
+      `<tr><td colspan="10"><p class="admin-note">
+         ${all.length
+            ? 'No projects match the current search and filters.'
+            : 'No projects yet. Use "New Project" to create the first one.'}
+       </p></td></tr>`;
+  } else {
+    $('#rows').innerHTML = slice.map(rowMarkup).join('');
+  }
+
+  const from = view.length ? start + 1 : 0;
+  $('#showing').textContent =
+    `Showing ${from}–${Math.min(start + PER_PAGE, view.length)} of ${view.length} projects`;
+
+  renderPager('#pager', page, view.length, PER_PAGE, (next) => {
+    page = next;
+    renderTable();
+    $('#table-h').scrollIntoView({ block: 'start' });
+  });
+}
+
+function rowMarkup(p) {
+  const own = p.owner?.full_name || '';
+  const { total, done } = taskInfo(p);
+  const overdue = isOverdue(p);
+
+  return `
+    <tr data-id="${p.id}">
+      <td><input type="checkbox" class="row-check" aria-label="Select ${esc(p.name)}"></td>
+      <td class="name">${esc(p.name)}</td>
+      <td>${esc(p.client?.name || '—')}</td>
+      <td><span class="avatar ${own ? '' : 'light'}" title="${esc(own || 'Unassigned')}">${initials(own)}</span></td>
+      <td><span class="badge" data-status="${esc(p.status)}">${esc(p.status)}</span></td>
+      <td class="num">${moneyShort(p.budget)}</td>
+      <td>${shortDate(p.started_on)}</td>
+      <td ${overdue ? 'style="color:var(--stop);font-weight:500"' : ''}>
+        ${shortDate(p.due_on)}${overdue ? ' · overdue' : ''}
+      </td>
+      <td>${total ? `${done}/${total}` : '—'}</td>
+      <td class="actions">
+        <span class="row">
+          <button class="btn sm icon-only" data-act="edit" data-id="${p.id}"
+                  aria-label="Edit ${esc(p.name)}">${icons.kebab}</button>
+        </span>
+      </td>
+    </tr>`;
+}
+
+function renderFilterNote() {
+  const active = [filters.status, filters.client].filter(Boolean).length;
+  const days = Number($('#period').value);
+  const bits = [];
+  if (filters.status) bits.push(filters.status);
+  if (filters.client) {
+    bits.push(clientOptions.find((c) => c.id === filters.client)?.name ?? 'one client');
+  }
+  if (Number.isFinite(days) && days > 0) bits.push(`created in last ${days} days`);
+
+  $('#filter-note').textContent = bits.length
+    ? `${view.length} of ${all.length} shown · ${bits.join(' · ')}`
+    : '';
+}
+
+/* ============================================================
+   Controls
+   ============================================================ */
+
+function wireControls() {
+  $('#q').addEventListener('input', debounce(render));
+  $('#period').addEventListener('change', render);
+
+  $$('thead th[data-sort]').forEach((th) => {
+    th.style.cursor = 'pointer';
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (sortKey === key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortKey = key; sortDir = 'asc'; }
+      render();
+    });
+  });
+
+  $('#check-all').addEventListener('change', (e) => {
+    $$('.row-check').forEach((c) => { c.checked = e.target.checked; });
+  });
+
+  $('#rows').addEventListener('click', (e) => {
+    const act = e.target.closest('[data-act]');
+    const id  = act?.dataset.id ?? e.target.closest('tr')?.dataset.id;
+    if (!id) return;
+    const project = all.find((p) => p.id === id);
+    if (!project) return;
+
+    if (act?.dataset.act === 'edit') { openSheet(project); return; }
+    if (e.target.closest('a, button, input, label')) return;
+    openSheet(project);
+  });
+
+  /* Pipeline: the kebab edits, and each column's button prefills its
+     own status. */
+  $('#pipeline').addEventListener('click', (e) => {
+    const menu = e.target.closest('[data-menu]');
+    if (menu) { openSheet(all.find((p) => p.id === menu.dataset.menu)); return; }
+
+    const add = e.target.closest('[data-add]');
+    if (add) openSheet(null, add.dataset.add);
+  });
+
+  $('#add-btn').addEventListener('click', () => openSheet(null, 'Planning'));
+  $('#export-btn').addEventListener('click', exportCsv);
+
+  $('#filter-btn').addEventListener('click', () => {
+    const open = $('#filters').classList.toggle('show');
+    $('#filter-btn').setAttribute('aria-expanded', String(open));
+  });
+
+  $('#f-status-filter').addEventListener('change', (e) => {
+    filters.status = e.target.value;
+    render();
+  });
+  $('#f-client-filter').addEventListener('change', (e) => {
+    filters.client = e.target.value;
+    render();
+  });
+
+  $('#filter-clear').addEventListener('click', () => {
+    filters.status = '';
+    filters.client = '';
+    $('#f-status-filter').value = '';
+    $('#f-client-filter').value = '';
+    $('#period').value = 'all';
+    $('#q').value = '';
+    render();
+  });
+}
+
+/* ============================================================
+   The project sheet
+   ============================================================ */
+
+const SHEET_FIELDS = [
+  ['#f-name', 'name'], ['#f-status', 'status'], ['#f-budget', 'budget'],
+  ['#f-started', 'started_on'], ['#f-due', 'due_on'],
+  ['#f-delivered', 'delivered_on'], ['#f-notes', 'notes'],
+];
+
+function openSheet(project = null, presetStatus = 'Planning') {
+  if (project && !project.id) return;
+  editing = project?.id ?? null;
+
+  const form = $('#project-form');
+  form.reset();
+  $$('.field.invalid', form).forEach((f) => f.classList.remove('invalid'));
+  setStatus($('#project-msg'), '');
+
+  $('#project-modal-h').textContent = project ? 'Edit project' : 'New project';
+  $('#project-modal-sub').textContent = project
+    ? `Update ${project.name} and save.`
+    : 'Start tracking a piece of work.';
+  $('#project-save').textContent = project ? 'Save changes' : 'Create project';
+  $('#project-delete').hidden = !project;
+
+  for (const [sel, key] of SHEET_FIELDS) {
+    const v = project?.[key];
+    $(sel).value = v == null ? '' : v;
+  }
+
+  if (project) {
+    $('#f-client').value = project.client?.id ?? '';
+    $('#f-owner').value  = project.owner?.id ?? '';
+  } else {
+    $('#f-budget').value = '0';
+    $('#f-status').value = presetStatus;
+    $('#f-owner').value  = session?.user?.id ?? '';
+  }
+
+  /* Read-only: where this project came from. Set only by converting a
+     won lead, and not editable here — `lead_id` is deliberately not in
+     SHEET_FIELDS, so a save cannot clear it. Shown so the captured link
+     is actually visible rather than invisible data. */
+  const fromLead = $('#project-lead');
+  const lead = project?.lead ?? null;
+  fromLead.hidden = !lead;
+  fromLead.innerHTML = lead
+    ? `From lead: <a href="leads.html">${esc(lead.name)}</a> ↗`
+    : '';
+
+  openDialog('#project-modal');
+  $('#f-name').focus();
+}
+
+function wireSheet() {
+  $('#project-form').addEventListener('submit', saveSheet);
+  $('#project-delete').addEventListener('click', () => {
+    const project = all.find((p) => p.id === editing);
+    if (project) removeProject(project);
+  });
+}
+
+async function saveSheet(e) {
+  e.preventDefault();
+
+  const payload = Object.fromEntries(new FormData(e.target).entries());
+  if (!validateSheet(payload)) return;
+
+  const save = $('#project-save');
+  save.disabled = true;
+  setStatus($('#project-msg'), 'Saving…', 'info');
+
+  try {
+    if (editing) {
+      const updated = await projects.update(editing, payload);
+      const i = all.findIndex((p) => p.id === editing);
+      if (i > -1) all[i] = updated;
+      closeSheet();
+      toast('Project updated.');
+    } else {
+      const created = await projects.create(payload, session?.user?.id);
+      all.unshift(created);
+      closeSheet();
+      toast('Project created.');
+    }
+    render(true);
+  } catch (err) {
+    console.error(err);
+    setStatus($('#project-msg'), err.message, 'error');
+  } finally {
+    save.disabled = false;
+  }
+}
+
+function validateSheet(payload) {
+  const nameOk = Boolean(String(payload.name ?? '').trim());
+  const budget = Number(payload.budget);
+  const budgetOk = String(payload.budget ?? '').trim() !== ''
+    && Number.isFinite(budget) && budget >= 0;
+
+  $('#f-name').closest('.field').classList.toggle('invalid', !nameOk);
+  $('#f-budget').closest('.field').classList.toggle('invalid', !budgetOk);
+
+  if (!nameOk) { $('#f-name').focus(); return false; }
+  if (!budgetOk) { $('#f-budget').focus(); return false; }
+  return true;
+}
+
+function closeSheet() {
+  closeDialog('#project-modal');
+  editing = null;
+}
+
+async function removeProject(project) {
+  const { total } = taskInfo(project);
+
+  /* tasks.project_id is `on delete cascade`, so this really does take
+     the tasks with it. That has to be said out loud. */
+  const consequence = total
+    ? `Its ${total} task${total === 1 ? '' : 's'} will be deleted as well.`
+    : '';
+
+  const ok = await confirmDialog({
+    title: 'Delete project',
+    body: dangerBody(project.name, consequence),
+    label: 'Delete project',
+  });
+  if (!ok) return;
+
+  try {
+    await projects.remove(project.id);
+    all = all.filter((p) => p.id !== project.id);
+    closeSheet();
+    render(true);
+    toast('Project deleted.');
+  } catch (err) {
+    console.error(err);
+    toast(`Could not delete that project: ${err.message}`, 'error');
+  }
+}
+
+/* ---------- CSV export ------------------------------------ */
+
+function exportCsv() {
+  if (!view.length) { toast('Nothing to export.'); return; }
+
+  const rows = [['Project', 'Client', 'Owner', 'Status', 'Budget',
+                 'Started', 'Due', 'Delivered', 'Tasks done', 'Tasks total']];
+
+  for (const p of view) {
+    const { total, done } = taskInfo(p);
+    rows.push([p.name, p.client?.name, p.owner?.full_name, p.status, p.budget,
+               p.started_on, p.due_on, p.delivered_on, done, total]);
+  }
+
+  downloadCsv(`scope-projects-${new Date().toISOString().slice(0, 10)}.csv`, rows);
+  toast(`Exported ${view.length} project${view.length === 1 ? '' : 's'}.`);
+}
+</script>
+</body>
+</html>
